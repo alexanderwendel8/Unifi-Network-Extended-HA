@@ -1,11 +1,10 @@
 """Tests for the official UniFi Network API client."""
 
 import aiohttp
-import pytest
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import pytest
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.unifi_network_extended.api import (
     UnifiApiClient,
@@ -83,3 +82,75 @@ async def test_errors(
     aioclient_mock.get(f"{BASE}/v1/info", **kwargs)
     with pytest.raises(error):
         await _client(hass).async_get_application_version()
+
+
+async def test_get_devices_clients_statistics(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Devices, clients and statistics are parsed from the API responses."""
+    page = {"offset": 0, "count": 1, "limit": 200, "totalCount": 1}
+    aioclient_mock.get(
+        f"{BASE}/v1/sites/s1/devices?offset=0&limit=200",
+        json={
+            **page,
+            "data": [
+                {
+                    "id": "d1",
+                    "name": "Gateway",
+                    "model": "UCG Ultra",
+                    "macAddress": "aa:bb:cc:00:00:01",
+                    "ipAddress": "192.168.1.1",
+                    "state": "ONLINE",
+                    "firmwareVersion": "4.1.13",
+                    "firmwareUpdatable": True,
+                    "features": ["gateway"],
+                    "interfaces": [],
+                    "supported": True,
+                }
+            ],
+        },
+    )
+    aioclient_mock.get(
+        f"{BASE}/v1/sites/s1/clients?offset=0&limit=200",
+        json={
+            **page,
+            "data": [
+                {
+                    "id": "c1",
+                    "name": "Phone",
+                    "type": "WIRELESS",
+                    "macAddress": "11:22:33:44:55:66",
+                    "ipAddress": "192.168.1.50",
+                    "connectedAt": "2026-11-18T08:00:00Z",
+                    "uplinkDeviceId": "d1",
+                    "access": {"type": "DEFAULT"},
+                }
+            ],
+        },
+    )
+    aioclient_mock.get(
+        f"{BASE}/v1/sites/s1/devices/d1/statistics/latest",
+        json={
+            "uptimeSec": 100,
+            "cpuUtilizationPct": 1.5,
+            "uplink": {"rxRateBps": 10, "txRateBps": 20},
+            "interfaces": {},
+        },
+    )
+    client = _client(hass)
+
+    (device,) = await client.async_get_devices("s1")
+    assert device.name == "Gateway"
+    assert device.firmware_updatable is True
+    assert device.features == frozenset({"gateway"})
+
+    (unifi_client,) = await client.async_get_clients("s1")
+    assert unifi_client.type == "WIRELESS"
+    assert unifi_client.connected_at.year == 2026
+    assert unifi_client.access_type == "DEFAULT"
+
+    stats = await client.async_get_device_statistics("s1", "d1")
+    assert stats.uptime_sec == 100
+    assert stats.cpu_utilization_pct == 1.5
+    assert stats.memory_utilization_pct is None
+    assert stats.uplink_tx_rate_bps == 20

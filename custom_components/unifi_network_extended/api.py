@@ -6,17 +6,17 @@ Only endpoints from the official OpenAPI specification in
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 import logging
 from typing import Any
 
 import aiohttp
-
 from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +44,97 @@ class UnifiSite:
     id: str
     name: str
     internal_reference: str
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiDevice:
+    """An adopted device (``GET /v1/sites/{siteId}/devices``)."""
+
+    id: str
+    name: str
+    model: str
+    mac_address: str
+    ip_address: str
+    state: str
+    firmware_version: str
+    firmware_updatable: bool
+    features: frozenset[str]
+
+    @classmethod
+    def from_api(cls, data: Mapping[str, Any]) -> UnifiDevice:
+        """Create from an "Adopted device overview" object."""
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            model=data["model"],
+            mac_address=data["macAddress"],
+            ip_address=data["ipAddress"],
+            state=data["state"],
+            firmware_version=data.get("firmwareVersion", ""),
+            firmware_updatable=data["firmwareUpdatable"],
+            features=frozenset(data.get("features", ())),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiClient:
+    """A connected client (``GET /v1/sites/{siteId}/clients``)."""
+
+    id: str
+    name: str
+    type: str  # WIRED, WIRELESS, VPN or TELEPORT
+    mac_address: str | None
+    ip_address: str | None
+    connected_at: datetime | None
+    uplink_device_id: str | None
+    access_type: str | None
+
+    @classmethod
+    def from_api(cls, data: Mapping[str, Any]) -> UnifiClient:
+        """Create from a "Client overview" object."""
+        connected_at = data.get("connectedAt")
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            type=data["type"],
+            mac_address=data.get("macAddress"),
+            ip_address=data.get("ipAddress"),
+            connected_at=dt_util.parse_datetime(connected_at) if connected_at else None,
+            uplink_device_id=data.get("uplinkDeviceId"),
+            access_type=(data.get("access") or {}).get("type"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiDeviceStatistics:
+    """Latest device statistics (``.../devices/{deviceId}/statistics/latest``).
+
+    All values are optional in the specification.
+    """
+
+    uptime_sec: int | None
+    cpu_utilization_pct: float | None
+    memory_utilization_pct: float | None
+    load_average_1min: float | None
+    load_average_5min: float | None
+    load_average_15min: float | None
+    uplink_rx_rate_bps: int | None
+    uplink_tx_rate_bps: int | None
+
+    @classmethod
+    def from_api(cls, data: Mapping[str, Any]) -> UnifiDeviceStatistics:
+        """Create from a "Latest statistics for a device" object."""
+        uplink = data.get("uplink") or {}
+        return cls(
+            uptime_sec=data.get("uptimeSec"),
+            cpu_utilization_pct=data.get("cpuUtilizationPct"),
+            memory_utilization_pct=data.get("memoryUtilizationPct"),
+            load_average_1min=data.get("loadAverage1Min"),
+            load_average_5min=data.get("loadAverage5Min"),
+            load_average_15min=data.get("loadAverage15Min"),
+            uplink_rx_rate_bps=uplink.get("rxRateBps"),
+            uplink_tx_rate_bps=uplink.get("txRateBps"),
+        )
 
 
 class UnifiApiClient:
@@ -80,6 +171,33 @@ class UnifiApiClient:
             )
             for item in await self._get_all_pages("/v1/sites")
         ]
+
+    async def async_get_devices(self, site_id: str) -> list[UnifiDevice]:
+        """Return all adopted devices (``GET /v1/sites/{siteId}/devices``)."""
+        return [
+            UnifiDevice.from_api(item)
+            for item in await self._get_all_pages(f"/v1/sites/{site_id}/devices")
+        ]
+
+    async def async_get_clients(self, site_id: str) -> list[UnifiClient]:
+        """Return all connected clients (``GET /v1/sites/{siteId}/clients``)."""
+        return [
+            UnifiClient.from_api(item)
+            for item in await self._get_all_pages(f"/v1/sites/{site_id}/clients")
+        ]
+
+    async def async_get_device_statistics(
+        self, site_id: str, device_id: str
+    ) -> UnifiDeviceStatistics:
+        """Return the latest statistics of a device.
+
+        ``GET /v1/sites/{siteId}/devices/{deviceId}/statistics/latest``
+        """
+        return UnifiDeviceStatistics.from_api(
+            await self._request(
+                "GET", f"/v1/sites/{site_id}/devices/{device_id}/statistics/latest"
+            )
+        )
 
     async def _get_all_pages(self, path: str) -> list[dict[str, Any]]:
         """Fetch every page of a paginated list endpoint (offset/limit)."""
@@ -124,7 +242,7 @@ class UnifiApiClient:
                 if response.status == 204:
                     return None
                 return await response.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        except (TimeoutError, aiohttp.ClientError) as err:
             # Headers (API key) are never logged.
             _LOGGER.debug("Error requesting %s %s: %s", method, path, err)
             raise UnifiCannotConnect from err

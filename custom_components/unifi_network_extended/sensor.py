@@ -1,0 +1,313 @@
+"""Sensors for UniFi Network Extended."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfDataRate
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
+
+from . import UnifiNetworkExtendedConfigEntry
+from .api import UnifiDevice, UnifiDeviceStatistics
+from .coordinator import UnifiSiteData
+from .entity import UnifiDeviceEntity, UnifiDeviceStatisticsEntity, UnifiSiteEntity
+
+PARALLEL_UPDATES = 0  # Coordinator based, no per-entity polling.
+
+# Device states from the "Adopted device overview" schema.
+DEVICE_STATES = [
+    "online",
+    "offline",
+    "pending_adoption",
+    "updating",
+    "getting_ready",
+    "adopting",
+    "deleting",
+    "connection_interrupted",
+    "isolated",
+    "u5g_incorrect_topology",
+]
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnifiSiteSensorDescription(SensorEntityDescription):
+    """Describes a sensor of the site."""
+
+    value_fn: Callable[[UnifiSiteData], int]
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnifiDeviceSensorDescription(SensorEntityDescription):
+    """Describes a sensor based on the device overview."""
+
+    value_fn: Callable[[UnifiDevice], str | None]
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnifiStatisticsSensorDescription(SensorEntityDescription):
+    """Describes a sensor based on the latest device statistics."""
+
+    value_fn: Callable[[UnifiDeviceStatistics], float | int | None]
+
+
+def _count_clients(client_type: str) -> Callable[[UnifiSiteData], int]:
+    return lambda data: sum(
+        client.type == client_type for client in data.clients.values()
+    )
+
+
+SITE_SENSORS: tuple[UnifiSiteSensorDescription, ...] = (
+    UnifiSiteSensorDescription(
+        key="clients",
+        translation_key="clients",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: len(data.clients),
+    ),
+    UnifiSiteSensorDescription(
+        key="clients_wired",
+        translation_key="clients_wired",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_count_clients("WIRED"),
+    ),
+    UnifiSiteSensorDescription(
+        key="clients_wireless",
+        translation_key="clients_wireless",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=_count_clients("WIRELESS"),
+    ),
+    UnifiSiteSensorDescription(
+        key="clients_vpn",
+        translation_key="clients_vpn",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        value_fn=lambda data: sum(
+            client.type in ("VPN", "TELEPORT") for client in data.clients.values()
+        ),
+    ),
+    UnifiSiteSensorDescription(
+        key="clients_guest",
+        translation_key="clients_guest",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
+        value_fn=lambda data: sum(
+            client.access_type == "GUEST" for client in data.clients.values()
+        ),
+    ),
+    UnifiSiteSensorDescription(
+        key="devices",
+        translation_key="devices",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: len(data.devices),
+    ),
+)
+
+DEVICE_SENSORS: tuple[UnifiDeviceSensorDescription, ...] = (
+    UnifiDeviceSensorDescription(
+        key="state",
+        translation_key="device_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=DEVICE_STATES,
+        value_fn=lambda device: (
+            state if (state := device.state.lower()) in DEVICE_STATES else None
+        ),
+    ),
+    UnifiDeviceSensorDescription(
+        key="ip_address",
+        translation_key="ip_address",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda device: device.ip_address or None,
+    ),
+    UnifiDeviceSensorDescription(
+        key="firmware_version",
+        translation_key="firmware_version",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda device: device.firmware_version or None,
+    ),
+)
+
+STATISTICS_SENSORS: tuple[UnifiStatisticsSensorDescription, ...] = (
+    UnifiStatisticsSensorDescription(
+        key="cpu_utilization",
+        translation_key="cpu_utilization",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda stats: stats.cpu_utilization_pct,
+    ),
+    UnifiStatisticsSensorDescription(
+        key="memory_utilization",
+        translation_key="memory_utilization",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda stats: stats.memory_utilization_pct,
+    ),
+    UnifiStatisticsSensorDescription(
+        key="uplink_rx_rate",
+        translation_key="uplink_rx_rate",
+        device_class=SensorDeviceClass.DATA_RATE,
+        native_unit_of_measurement=UnitOfDataRate.BITS_PER_SECOND,
+        suggested_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+        suggested_display_precision=2,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda stats: stats.uplink_rx_rate_bps,
+    ),
+    UnifiStatisticsSensorDescription(
+        key="uplink_tx_rate",
+        translation_key="uplink_tx_rate",
+        device_class=SensorDeviceClass.DATA_RATE,
+        native_unit_of_measurement=UnitOfDataRate.BITS_PER_SECOND,
+        suggested_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+        suggested_display_precision=2,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda stats: stats.uplink_tx_rate_bps,
+    ),
+    UnifiStatisticsSensorDescription(
+        key="load_average_1min",
+        translation_key="load_average_1min",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        entity_registry_enabled_default=False,
+        value_fn=lambda stats: stats.load_average_1min,
+    ),
+    UnifiStatisticsSensorDescription(
+        key="load_average_5min",
+        translation_key="load_average_5min",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        entity_registry_enabled_default=False,
+        value_fn=lambda stats: stats.load_average_5min,
+    ),
+    UnifiStatisticsSensorDescription(
+        key="load_average_15min",
+        translation_key="load_average_15min",
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        entity_registry_enabled_default=False,
+        value_fn=lambda stats: stats.load_average_15min,
+    ),
+)
+
+UPTIME_SENSOR = SensorEntityDescription(
+    key="uptime",
+    translation_key="uptime",
+    device_class=SensorDeviceClass.TIMESTAMP,
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: UnifiNetworkExtendedConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Set up sensors."""
+    site_coordinator = entry.runtime_data.site_coordinator
+    statistics_coordinator = entry.runtime_data.statistics_coordinator
+
+    async_add_entities(
+        UnifiSiteSensor(site_coordinator, description) for description in SITE_SENSORS
+    )
+
+    known: set[str] = set()
+
+    @callback
+    def _async_add_new_devices() -> None:
+        new_ids = set(site_coordinator.data.devices) - known
+        if not new_ids:
+            return
+        known.update(new_ids)
+        entities: list[SensorEntity] = []
+        for device_id in new_ids:
+            entities.extend(
+                UnifiDeviceSensor(site_coordinator, description, device_id)
+                for description in DEVICE_SENSORS
+            )
+            entities.extend(
+                UnifiStatisticsSensor(
+                    statistics_coordinator, site_coordinator, description, device_id
+                )
+                for description in STATISTICS_SENSORS
+            )
+            entities.append(
+                UnifiUptimeSensor(
+                    statistics_coordinator, site_coordinator, UPTIME_SENSOR, device_id
+                )
+            )
+        async_add_entities(entities)
+
+    _async_add_new_devices()
+    entry.async_on_unload(site_coordinator.async_add_listener(_async_add_new_devices))
+
+
+class UnifiSiteSensor(UnifiSiteEntity, SensorEntity):
+    """Sensor of the site, e.g. number of connected clients."""
+
+    entity_description: UnifiSiteSensorDescription
+
+    @property
+    def native_value(self) -> int:
+        """Return the sensor value."""
+        return self.entity_description.value_fn(self.coordinator.data)
+
+
+class UnifiDeviceSensor(UnifiDeviceEntity, SensorEntity):
+    """Sensor based on the device overview."""
+
+    entity_description: UnifiDeviceSensorDescription
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the sensor value."""
+        if (device := self.device) is None:
+            return None
+        return self.entity_description.value_fn(device)
+
+
+class UnifiStatisticsSensor(UnifiDeviceStatisticsEntity, SensorEntity):
+    """Sensor based on the latest device statistics."""
+
+    entity_description: UnifiStatisticsSensorDescription
+
+    @property
+    def native_value(self) -> float | int | None:
+        """Return the sensor value."""
+        if (stats := self.statistics) is None:
+            return None
+        return self.entity_description.value_fn(stats)
+
+
+class UnifiUptimeSensor(UnifiDeviceStatisticsEntity, SensorEntity):
+    """Time of the last device start, derived from the uptime."""
+
+    _last_boot: datetime | None = None
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the boot time.
+
+        Recomputing ``now - uptime`` drifts by a few seconds on every poll, so the
+        value only changes when it moved by more than a minute (i.e. a reboot).
+        """
+        stats = self.statistics
+        if stats is None or stats.uptime_sec is None:
+            return self._last_boot
+        boot = (dt_util.utcnow() - timedelta(seconds=stats.uptime_sec)).replace(
+            microsecond=0
+        )
+        if self._last_boot is None or abs(boot - self._last_boot) > timedelta(
+            minutes=1
+        ):
+            self._last_boot = boot
+        return self._last_boot

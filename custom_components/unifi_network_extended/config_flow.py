@@ -6,11 +6,20 @@ from collections.abc import Mapping
 import logging
 from typing import Any
 
-import voluptuous as vol
-
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_VERIFY_SSL
-from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.const import (
+    CONF_API_KEY,
+    CONF_HOST,
+    CONF_PORT,
+    CONF_SCAN_INTERVAL,
+    CONF_VERIFY_SSL,
+)
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -23,9 +32,20 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+import voluptuous as vol
 
 from .api import UnifiApiError, UnifiInvalidAuth, UnifiSite, async_create_api_client
-from .const import CONF_SITE_ID, DEFAULT_PORT, DEFAULT_VERIFY_SSL, DOMAIN
+from .const import (
+    CONF_SITE_ID,
+    CONF_STATISTICS_INTERVAL,
+    CONF_TRACK_CLIENTS,
+    DEFAULT_PORT,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_STATISTICS_INTERVAL,
+    DEFAULT_TRACK_CLIENTS,
+    DEFAULT_VERIFY_SSL,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,7 +64,9 @@ def _connection_schema(defaults: Mapping[str, Any]) -> vol.Schema:
     """Return the schema for the connection settings (without API key default)."""
     return vol.Schema(
         {
-            vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, vol.UNDEFINED)): str,
+            vol.Required(
+                CONF_HOST, default=defaults.get(CONF_HOST, vol.UNDEFINED)
+            ): str,
             vol.Required(
                 CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT)
             ): PORT_SELECTOR,
@@ -105,6 +127,12 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
     MINOR_VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Return the options flow."""
+        return UnifiNetworkExtendedOptionsFlow()
 
     def __init__(self) -> None:
         """Initialize the flow."""
@@ -229,4 +257,53 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({vol.Required(CONF_API_KEY): API_KEY_SELECTOR}),
             description_placeholders={CONF_HOST: entry.data[CONF_HOST]},
             errors=errors,
+        )
+
+
+def _interval_selector(minimum: int) -> vol.All:
+    return vol.All(
+        NumberSelector(
+            NumberSelectorConfig(
+                min=minimum,
+                max=3600,
+                step=1,
+                mode=NumberSelectorMode.BOX,
+                unit_of_measurement="s",
+            )
+        ),
+        vol.Coerce(int),
+    )
+
+
+class UnifiNetworkExtendedOptionsFlow(OptionsFlow):
+    """Options: polling intervals and client tracking."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        options = self.config_entry.options
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_SCAN_INTERVAL,
+                        default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                    ): _interval_selector(10),
+                    vol.Required(
+                        CONF_STATISTICS_INTERVAL,
+                        default=options.get(
+                            CONF_STATISTICS_INTERVAL, DEFAULT_STATISTICS_INTERVAL
+                        ),
+                    ): _interval_selector(30),
+                    vol.Required(
+                        CONF_TRACK_CLIENTS,
+                        default=options.get(CONF_TRACK_CLIENTS, DEFAULT_TRACK_CLIENTS),
+                    ): bool,
+                }
+            ),
         )

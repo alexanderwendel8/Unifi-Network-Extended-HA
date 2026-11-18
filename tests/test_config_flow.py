@@ -2,12 +2,11 @@
 
 from unittest.mock import patch
 
-import pytest
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.unifi_network_extended.api import (
@@ -200,3 +199,23 @@ async def test_reconfigure_site_missing(hass: HomeAssistant) -> None:
         )
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "site_not_found"}
+
+
+async def test_options_flow(hass: HomeAssistant) -> None:
+    """Polling intervals and client tracking can be changed."""
+    entry = _entry(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"scan_interval": 15, "statistics_interval": 120, "track_clients": False},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == {
+        "scan_interval": 15,
+        "statistics_interval": 120,
+        "track_clients": False,
+    }

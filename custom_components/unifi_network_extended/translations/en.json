@@ -53,5 +53,94 @@
       "reconfigure_successful": "Re-configuration was successful",
       "no_sites": "No sites were found for this API key."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Update interval for devices and clients",
+          "statistics_interval": "Update interval for device statistics",
+          "track_clients": "Track clients"
+        },
+        "data_description": {
+          "scan_interval": "The UniFi Network API offers no push updates, data is polled. Minimum 10 s.",
+          "statistics_interval": "Needs one request per device. Minimum 30 s.",
+          "track_clients": "Creates a device tracker for every wired or wireless client. Disabling removes the trackers."
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "firmware_update": {
+        "name": "Firmware update"
+      }
+    },
+    "sensor": {
+      "clients": {
+        "name": "Connected clients"
+      },
+      "clients_wired": {
+        "name": "Wired clients"
+      },
+      "clients_wireless": {
+        "name": "Wireless clients"
+      },
+      "clients_vpn": {
+        "name": "VPN clients"
+      },
+      "clients_guest": {
+        "name": "Guest clients"
+      },
+      "devices": {
+        "name": "Adopted devices"
+      },
+      "device_state": {
+        "name": "State",
+        "state": {
+          "online": "Online",
+          "offline": "Offline",
+          "pending_adoption": "Pending adoption",
+          "updating": "Updating",
+          "getting_ready": "Getting ready",
+          "adopting": "Adopting",
+          "deleting": "Deleting",
+          "connection_interrupted": "Connection interrupted",
+          "isolated": "Isolated",
+          "u5g_incorrect_topology": "Incorrect topology (U5G)"
+        }
+      },
+      "ip_address": {
+        "name": "IP address"
+      },
+      "firmware_version": {
+        "name": "Firmware version"
+      },
+      "cpu_utilization": {
+        "name": "CPU utilization"
+      },
+      "memory_utilization": {
+        "name": "Memory utilization"
+      },
+      "uplink_rx_rate": {
+        "name": "Uplink download rate"
+      },
+      "uplink_tx_rate": {
+        "name": "Uplink upload rate"
+      },
+      "load_average_1min": {
+        "name": "Load average (1 min)"
+      },
+      "load_average_5min": {
+        "name": "Load average (5 min)"
+      },
+      "load_average_15min": {
+        "name": "Load average (15 min)"
+      },
+      "uptime": {
+        "name": "Last restart"
+      }
+    }
   }
 }

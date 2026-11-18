@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, Platform
+from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
@@ -20,10 +20,19 @@ from .api import (
     UnifiSite,
     async_create_api_client,
 )
-from .const import CONF_SITE_ID
+from .const import (
+    CONF_SITE_ID,
+    CONF_STATISTICS_INTERVAL,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_STATISTICS_INTERVAL,
+)
+from .coordinator import UnifiSiteCoordinator, UnifiStatisticsCoordinator
 
-# Add platforms here once entities are implemented, e.g. Platform.SENSOR.
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.DEVICE_TRACKER,
+    Platform.SENSOR,
+]
 
 
 @dataclass(slots=True)
@@ -32,6 +41,8 @@ class UnifiRuntimeData:
 
     client: UnifiApiClient
     site: UnifiSite
+    site_coordinator: UnifiSiteCoordinator
+    statistics_coordinator: UnifiStatisticsCoordinator
 
 
 type UnifiNetworkExtendedConfigEntry = ConfigEntry[UnifiRuntimeData]
@@ -59,10 +70,40 @@ async def async_setup_entry(
         # Not retried: the site was deleted or the API key has no access to it.
         raise ConfigEntryError(f"Site {entry.title} no longer exists")
 
-    entry.runtime_data = UnifiRuntimeData(client=client, site=site)
+    site_coordinator = UnifiSiteCoordinator(
+        hass,
+        entry,
+        client,
+        site,
+        entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+    )
+    await site_coordinator.async_config_entry_first_refresh()
 
+    statistics_coordinator = UnifiStatisticsCoordinator(
+        hass,
+        entry,
+        site_coordinator,
+        entry.options.get(CONF_STATISTICS_INTERVAL, DEFAULT_STATISTICS_INTERVAL),
+    )
+    await statistics_coordinator.async_config_entry_first_refresh()
+
+    entry.runtime_data = UnifiRuntimeData(
+        client=client,
+        site=site,
+        site_coordinator=site_coordinator,
+        statistics_coordinator=statistics_coordinator,
+    )
+
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def _async_options_updated(
+    hass: HomeAssistant, entry: UnifiNetworkExtendedConfigEntry
+) -> None:
+    """Reload the entry when the options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(

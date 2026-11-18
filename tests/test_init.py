@@ -1,79 +1,89 @@
 """Tests for setting up and unloading a config entry."""
 
-from unittest.mock import patch
-
-import pytest
+from dataclasses import replace
+from unittest.mock import AsyncMock
 
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
-from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.unifi_network_extended.api import (
     UnifiCannotConnect,
+    UnifiDeviceStatistics,
     UnifiInvalidAuth,
-    UnifiSite,
 )
-from custom_components.unifi_network_extended.const import CONF_SITE_ID, DOMAIN
+from custom_components.unifi_network_extended.const import DOMAIN
 
-SITE = UnifiSite("site-default", "Default", "default")
-GET_SITES = (
-    "custom_components.unifi_network_extended.api.UnifiApiClient.async_get_sites"
-)
+from .conftest import ACCESS_POINT, GATEWAY, GATEWAY_STATS, SITE
 
 
-@pytest.fixture
-def entry(hass: HomeAssistant) -> MockConfigEntry:
-    """Return a config entry added to hass."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Default",
-        unique_id=SITE.id,
-        data={
-            CONF_HOST: "192.168.1.1",
-            CONF_PORT: 443,
-            CONF_API_KEY: "secret-key",
-            CONF_VERIFY_SSL: True,
-            CONF_SITE_ID: SITE.id,
-        },
-    )
-    entry.add_to_hass(hass)
-    return entry
-
-
-async def test_setup_and_unload(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+async def test_setup_and_unload(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
     """The entry loads with the configured site and unloads again."""
-    with patch(GET_SITES, return_value=[SITE]):
-        assert await hass.config_entries.async_setup(entry.entry_id)
-    assert entry.state is ConfigEntryState.LOADED
-    assert entry.runtime_data.site == SITE
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert config_entry.runtime_data.site == SITE
+    # Statistics are only requested for online devices.
+    mock_api["statistics"].assert_awaited_once_with(SITE.id, "dev-gw")
 
-    assert await hass.config_entries.async_unload(entry.entry_id)
-    assert entry.state is ConfigEntryState.NOT_LOADED
+    assert await hass.config_entries.async_unload(config_entry.entry_id)
+    assert config_entry.state is ConfigEntryState.NOT_LOADED
 
 
 @pytest.mark.parametrize(
-    ("kwargs", "state"),
+    ("mock", "kwargs", "state"),
     [
-        ({"side_effect": UnifiCannotConnect}, ConfigEntryState.SETUP_RETRY),
-        ({"side_effect": UnifiInvalidAuth}, ConfigEntryState.SETUP_ERROR),
-        ({"return_value": []}, ConfigEntryState.SETUP_ERROR),
+        ("sites", {"side_effect": UnifiCannotConnect}, ConfigEntryState.SETUP_RETRY),
+        ("sites", {"side_effect": UnifiInvalidAuth}, ConfigEntryState.SETUP_ERROR),
+        ("sites", {"return_value": []}, ConfigEntryState.SETUP_ERROR),
+        ("devices", {"side_effect": UnifiCannotConnect}, ConfigEntryState.SETUP_RETRY),
+        ("clients", {"side_effect": UnifiInvalidAuth}, ConfigEntryState.SETUP_ERROR),
+        (
+            "statistics",
+            {"side_effect": UnifiCannotConnect},
+            ConfigEntryState.SETUP_RETRY,
+        ),
     ],
 )
 async def test_setup_failures(
-    hass: HomeAssistant, entry: MockConfigEntry, kwargs: dict, state: ConfigEntryState
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    mock: str,
+    kwargs: dict,
+    state: ConfigEntryState,
 ) -> None:
     """Connection errors retry; invalid keys and missing sites do not."""
-    with patch(GET_SITES, **kwargs):
-        await hass.config_entries.async_setup(entry.entry_id)
-    assert entry.state is state
+    mock_api[mock].configure_mock(**kwargs)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    assert config_entry.state is state
 
 
 async def test_invalid_key_starts_reauth(
-    hass: HomeAssistant, entry: MockConfigEntry
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
 ) -> None:
     """An invalid API key starts the reauth flow."""
-    with patch(GET_SITES, side_effect=UnifiInvalidAuth):
-        await hass.config_entries.async_setup(entry.entry_id)
+    mock_api["sites"].side_effect = UnifiInvalidAuth
+    await hass.config_entries.async_setup(config_entry.entry_id)
     flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
     assert [flow["context"]["source"] for flow in flows] == [SOURCE_REAUTH]
+
+
+async def test_statistics_partial_failure(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
+    """A single failing device does not fail the statistics update."""
+    mock_api["devices"].return_value = [GATEWAY, replace(ACCESS_POINT, state="ONLINE")]
+
+    async def statistics(site_id: str, device_id: str) -> UnifiDeviceStatistics:
+        if device_id == ACCESS_POINT.id:
+            raise UnifiCannotConnect
+        return GATEWAY_STATS
+
+    mock_api["statistics"].side_effect = statistics
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    assert config_entry.runtime_data.statistics_coordinator.data == {
+        GATEWAY.id: GATEWAY_STATS
+    }

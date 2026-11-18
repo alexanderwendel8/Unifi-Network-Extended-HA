@@ -18,4 +18,28 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: UnifiNetworkExtendedConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    return {"entry": async_redact_data(entry.as_dict(), TO_REDACT)}
+    runtime = entry.runtime_data
+    site_data = runtime.site_coordinator.data
+    # Only counts and states; client names and addresses are personal data.
+    return {
+        "entry": async_redact_data(entry.as_dict(), TO_REDACT),
+        "site_coordinator": {
+            "last_update_success": runtime.site_coordinator.last_update_success,
+            "device_count": len(site_data.devices),
+            "client_count": len(site_data.clients),
+            "devices": [
+                {
+                    "model": device.model,
+                    "state": device.state,
+                    "firmware_version": device.firmware_version,
+                    "firmware_updatable": device.firmware_updatable,
+                    "features": sorted(device.features),
+                }
+                for device in site_data.devices.values()
+            ],
+        },
+        "statistics_coordinator": {
+            "last_update_success": runtime.statistics_coordinator.last_update_success,
+            "device_count": len(runtime.statistics_coordinator.data),
+        },
+    }
