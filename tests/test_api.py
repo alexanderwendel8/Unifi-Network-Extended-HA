@@ -154,3 +154,17 @@ async def test_get_devices_clients_statistics(
     assert stats.cpu_utilization_pct == 1.5
     assert stats.memory_utilization_pct is None
     assert stats.uplink_tx_rate_bps == 20
+
+
+async def test_restart_device(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """The restart action is posted; the empty 200 response is accepted."""
+    aioclient_mock.post(f"{BASE}/v1/sites/s1/devices/d1/actions", status=200)
+
+    await _client(hass).async_restart_device("s1", "d1")
+
+    _, url, body, headers = aioclient_mock.mock_calls[0]
+    assert url.path == "/proxy/network/integration/v1/sites/s1/devices/d1/actions"
+    assert body == {"action": "RESTART"}
+    assert headers["X-API-KEY"] == "key"

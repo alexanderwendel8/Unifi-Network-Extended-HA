@@ -53,6 +53,7 @@ Home Assistant automatisch einen neuen an.
 - CPU- und Speicherauslastung, Uplink Download- und Upload-Rate
 - Letzter Neustart, IP-Adresse
 - Firmware-Version und Systemlast (standardmäßig deaktiviert)
+- Knopf *Neu starten* (nur verfügbar, solange das Gerät online ist)
 
 Statistikwerte gibt es nur für Geräte, die online sind. Neu adoptierte Geräte
 erhalten ihre Entitäten automatisch, ohne Neustart.

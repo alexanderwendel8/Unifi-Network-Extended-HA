@@ -142,5 +142,13 @@
         "name": "Letzter Neustart"
       }
     }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "Der API-Schlüssel ist nicht mehr gültig. Bitte die Integration erneut anmelden."
+    },
+    "restart_failed": {
+      "message": "Neustart von {device} fehlgeschlagen: {error}"
+    }
   }
 }

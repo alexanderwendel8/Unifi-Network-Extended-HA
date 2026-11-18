@@ -142,5 +142,13 @@
         "name": "Last restart"
       }
     }
+  },
+  "exceptions": {
+    "invalid_auth": {
+      "message": "The API key is no longer valid. Please re-authenticate the integration."
+    },
+    "restart_failed": {
+      "message": "Restarting {device} failed: {error}"
+    }
   }
 }
