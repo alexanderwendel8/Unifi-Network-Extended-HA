@@ -1,0 +1,146 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit UniFi Network verbinden",
+        "description": "Gib die Verbindungsdaten deiner UniFi Network Anwendung ein. Es wird die offizielle UniFi Network API verwendet.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "api_key": "API-Schlüssel",
+          "verify_ssl": "SSL-Zertifikat prüfen"
+        },
+        "data_description": {
+          "host": "Hostname oder IP-Adresse der UniFi-Konsole bzw. des Controllers.",
+          "port": "Meist 443 (UniFi-OS-Konsole).",
+          "api_key": "Erzeuge einen API-Schlüssel im Bereich „Integrationen“ deiner UniFi Network Anwendung.",
+          "verify_ssl": "Nur deaktivieren, wenn der Controller ein selbstsigniertes Zertifikat verwendet."
+        }
+      },
+      "site": {
+        "title": "Standort auswählen",
+        "description": "Die UniFi Network Anwendung verwaltet mehrere Standorte. Wähle den Standort, der hinzugefügt werden soll. Für weitere Standorte die Integration erneut hinzufügen.",
+        "data": {
+          "site_id": "Standort"
+        }
+      },
+      "reconfigure": {
+        "title": "UniFi Network neu konfigurieren",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "api_key": "API-Schlüssel",
+          "verify_ssl": "SSL-Zertifikat prüfen"
+        }
+      },
+      "reauth_confirm": {
+        "title": "UniFi Network erneut anmelden",
+        "description": "Der API-Schlüssel für {host} ist nicht mehr gültig. Bitte gib einen neuen ein.",
+        "data": {
+          "api_key": "API-Schlüssel"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen",
+      "invalid_auth": "Ungültiger API-Schlüssel",
+      "unknown": "Unerwarteter Fehler",
+      "site_not_found": "Der eingerichtete Standort existiert nicht mehr oder der API-Schlüssel hat keinen Zugriff darauf."
+    },
+    "abort": {
+      "already_configured": "Dieser Standort ist bereits eingerichtet",
+      "reauth_successful": "Erneute Anmeldung erfolgreich",
+      "reconfigure_successful": "Neukonfiguration erfolgreich",
+      "no_sites": "Für diesen API-Schlüssel wurden keine Standorte gefunden."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Optionen",
+        "data": {
+          "scan_interval": "Abrufintervall für Geräte und Clients",
+          "statistics_interval": "Abrufintervall für Gerätestatistik",
+          "track_clients": "Clients verfolgen"
+        },
+        "data_description": {
+          "scan_interval": "Die UniFi Network API bietet keine Push-Updates, die Daten werden abgefragt. Mindestens 10 s.",
+          "statistics_interval": "Benötigt eine Anfrage pro Gerät. Mindestens 30 s.",
+          "track_clients": "Legt für jeden kabelgebundenen oder WLAN-Client einen Device-Tracker an. Beim Deaktivieren werden die Tracker entfernt."
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "firmware_update": {
+        "name": "Firmware-Update"
+      }
+    },
+    "sensor": {
+      "clients": {
+        "name": "Verbundene Clients"
+      },
+      "clients_wired": {
+        "name": "Kabelgebundene Clients"
+      },
+      "clients_wireless": {
+        "name": "WLAN-Clients"
+      },
+      "clients_vpn": {
+        "name": "VPN-Clients"
+      },
+      "clients_guest": {
+        "name": "Gast-Clients"
+      },
+      "devices": {
+        "name": "Adoptierte Geräte"
+      },
+      "device_state": {
+        "name": "Status",
+        "state": {
+          "online": "Online",
+          "offline": "Offline",
+          "pending_adoption": "Wartet auf Adoption",
+          "updating": "Wird aktualisiert",
+          "getting_ready": "Wird vorbereitet",
+          "adopting": "Wird adoptiert",
+          "deleting": "Wird gelöscht",
+          "connection_interrupted": "Verbindung unterbrochen",
+          "isolated": "Isoliert",
+          "u5g_incorrect_topology": "Falsche Topologie (U5G)"
+        }
+      },
+      "ip_address": {
+        "name": "IP-Adresse"
+      },
+      "firmware_version": {
+        "name": "Firmware-Version"
+      },
+      "cpu_utilization": {
+        "name": "CPU-Auslastung"
+      },
+      "memory_utilization": {
+        "name": "Speicherauslastung"
+      },
+      "uplink_rx_rate": {
+        "name": "Uplink Download-Rate"
+      },
+      "uplink_tx_rate": {
+        "name": "Uplink Upload-Rate"
+      },
+      "load_average_1min": {
+        "name": "Systemlast (1 min)"
+      },
+      "load_average_5min": {
+        "name": "Systemlast (5 min)"
+      },
+      "load_average_15min": {
+        "name": "Systemlast (15 min)"
+      },
+      "uptime": {
+        "name": "Letzter Neustart"
+      }
+    }
+  }
+}
