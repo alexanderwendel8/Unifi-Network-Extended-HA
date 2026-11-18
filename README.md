@@ -1,9 +1,11 @@
 # UniFi Network Extended für Home Assistant
 
-Custom Integration für Home Assistant, die einen UniFi Network Controller
-(UniFi-OS-Konsole wie UDM/UCG/Cloud Key oder selbst gehosteter Controller) anbindet.
+Custom Integration für Home Assistant, die eine UniFi Network Anwendung
+(z. B. UniFi-OS-Konsole wie UDM/UCG/Cloud Key) über die **offizielle
+UniFi Network API** anbindet. Die verwendete Spezifikation liegt unter
+[`docs/unifi-network-api.openapi.json`](docs/unifi-network-api.openapi.json).
 
-> Status: Grundgerüst – Einrichtung und Anmeldung sind implementiert, Entitäten folgen.
+> Status: Grundgerüst – Einrichtung und Prüfung des API-Schlüssels sind implementiert, Entitäten folgen.
 
 ## Installation
 
@@ -23,31 +25,34 @@ Ordner `custom_components/unifi_network_extended` nach
 | Feld | Beschreibung |
 |---|---|
 | Host | Hostname oder IP-Adresse des Controllers |
-| Port | `443` (UniFi OS) bzw. `8443` (selbst gehosteter Controller) |
-| Benutzername / Passwort | Empfohlen: eigener **lokaler** UniFi-Benutzer mit minimal nötigen Rechten |
+| Port | meist `443` |
+| API-Schlüssel | Wird im Bereich *Integrationen* der UniFi Network Anwendung erzeugt |
 | SSL-Zertifikat prüfen | Nur bei selbstsignierten Zertifikaten deaktivieren |
 
-Die Zugangsdaten werden beim Einrichten durch einen Login-Versuch geprüft.
-Host, Port, Zugangsdaten und SSL-Option lassen sich später über
-*⋮ → Neu konfigurieren* ändern. Werden die Zugangsdaten ungültig, fordert
-Home Assistant automatisch zur erneuten Anmeldung auf.
+Der API-Schlüssel wird beim Einrichten mit einem Aufruf von `GET /v1/info` geprüft.
+Host, Port, API-Schlüssel und SSL-Option lassen sich später über
+*⋮ → Neu konfigurieren* ändern. Wird der API-Schlüssel ungültig, fordert
+Home Assistant automatisch einen neuen an.
 
-## Speicherung der Zugangsdaten
+## Speicherung des API-Schlüssels
 
 Die Daten werden – wie bei allen Core-Integrationen – im Config Entry von
 Home Assistant gespeichert (`<config>/.storage/core.config_entries`), nicht in
 der `configuration.yaml`. Zusätzlich gilt:
 
-- Das Passwort wird im UI als Passwortfeld angezeigt und nie vorausgefüllt.
-- Passwort, Benutzername und Host werden in Diagnosedaten geschwärzt und nicht geloggt.
-- Die Integration nutzt eine eigene HTTP-Session, damit das Login-Cookie nicht
-  mit anderen Integrationen geteilt wird.
+- Der API-Schlüssel wird im UI als verdecktes Feld angezeigt und nie vorausgefüllt.
+- API-Schlüssel und Host werden in Diagnosedaten geschwärzt und nicht geloggt.
 - SSL-Prüfung ist standardmäßig aktiviert.
+- Es wird kein Benutzerpasswort gespeichert; der API-Schlüssel kann in UniFi
+  jederzeit widerrufen werden.
 
 Schütze das `.storage`-Verzeichnis und deine Backups entsprechend
 (Backups von Home Assistant lassen sich verschlüsseln).
 
 ## Entwicklung
+
+Neue Funktionen werden ausschließlich gegen die offizielle API aus
+`docs/unifi-network-api.openapi.json` entwickelt (siehe `CLAUDE.md`).
 
 ```bash
 pip install -r requirements_test.txt

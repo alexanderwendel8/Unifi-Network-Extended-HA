@@ -3,18 +3,17 @@
     "step": {
       "user": {
         "title": "Connect to UniFi Network",
-        "description": "Enter the connection details of your UniFi Network controller.",
+        "description": "Enter the connection details of your UniFi Network application. The official UniFi Network API is used.",
         "data": {
           "host": "Host",
           "port": "Port",
-          "username": "Username",
-          "password": "Password",
+          "api_key": "API key",
           "verify_ssl": "Verify SSL certificate"
         },
         "data_description": {
           "host": "Hostname or IP address of the UniFi console or controller.",
-          "port": "Usually 443 for UniFi OS consoles or 8443 for a self-hosted controller.",
-          "username": "A local UniFi account is recommended (no 2FA / UI.com account).",
+          "port": "Usually 443 (UniFi OS console).",
+          "api_key": "Create an API key in the Integrations section of your UniFi Network application.",
           "verify_ssl": "Disable only if the controller uses a self-signed certificate."
         }
       },
@@ -23,23 +22,21 @@
         "data": {
           "host": "Host",
           "port": "Port",
-          "username": "Username",
-          "password": "Password",
+          "api_key": "API key",
           "verify_ssl": "Verify SSL certificate"
         }
       },
       "reauth_confirm": {
         "title": "Re-authenticate UniFi Network",
-        "description": "The credentials for {host} are no longer valid. Please enter them again.",
+        "description": "The API key for {host} is no longer valid. Please enter a new one.",
         "data": {
-          "username": "Username",
-          "password": "Password"
+          "api_key": "API key"
         }
       }
     },
     "error": {
       "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
+      "invalid_auth": "Invalid API key",
       "unknown": "Unexpected error"
     },
     "abort": {

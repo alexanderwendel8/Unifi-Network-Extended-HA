@@ -1,27 +1,28 @@
-"""Minimal API client for a UniFi Network controller."""
+"""Client for the official UniFi Network API (Integration API).
+
+Only endpoints from the official OpenAPI specification in
+``docs/unifi-network-api.openapi.json`` may be used here.
+"""
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
+from dataclasses import dataclass
 import logging
 from typing import Any
 
 import aiohttp
 
-from homeassistant.const import (
-    CONF_HOST,
-    CONF_PASSWORD,
-    CONF_PORT,
-    CONF_USERNAME,
-    CONF_VERIFY_SSL,
-)
+from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 _LOGGER = logging.getLogger(__name__)
 
+API_BASE_PATH = "/proxy/network/integration"
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=15)
+PAGE_LIMIT = 200  # Maximum page size allowed by the API.
 
 
 class UnifiApiError(Exception):
@@ -33,16 +34,23 @@ class UnifiCannotConnect(UnifiApiError):
 
 
 class UnifiInvalidAuth(UnifiApiError):
-    """Raised when the credentials are rejected."""
+    """Raised when the API key is missing, invalid or lacks permissions."""
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiSite:
+    """A local site (``GET /v1/sites``)."""
+
+    id: str
+    name: str
+    internal_reference: str
 
 
 class UnifiApiClient:
-    """Small client used to authenticate against a UniFi controller.
+    """Client for the official UniFi Network API.
 
+    Authentication uses an API key sent in the ``X-API-KEY`` header.
     SSL verification is configured on the passed ClientSession.
-
-    Supports UniFi OS consoles (UDM, UCG, Cloud Key Gen2+, ...) and the
-    classic self-hosted Network application.
     """
 
     def __init__(
@@ -50,69 +58,96 @@ class UnifiApiClient:
         session: aiohttp.ClientSession,
         host: str,
         port: int,
-        username: str,
-        password: str,
+        api_key: str,
     ) -> None:
         """Initialize the client."""
         self._session = session
-        self._base_url = f"https://{host}:{port}"
-        self._username = username
-        self._password = password
-        self.is_unifi_os: bool | None = None
+        self._base_url = f"https://{host}:{port}{API_BASE_PATH}"
+        self._headers = {"X-API-KEY": api_key, "Accept": "application/json"}
 
-    async def login(self) -> None:
-        """Authenticate against the controller.
+    async def async_get_application_version(self) -> str:
+        """Return the Network application version (``GET /v1/info``)."""
+        data = await self._request("GET", "/v1/info")
+        return data["applicationVersion"]
 
-        Raises UnifiInvalidAuth or UnifiCannotConnect on failure.
-        """
-        payload = {
-            "username": self._username,
-            "password": self._password,
-            "remember": True,
-        }
+    async def async_get_sites(self) -> list[UnifiSite]:
+        """Return all local sites (``GET /v1/sites``)."""
+        return [
+            UnifiSite(
+                id=item["id"],
+                name=item["name"],
+                internal_reference=item["internalReference"],
+            )
+            for item in await self._get_all_pages("/v1/sites")
+        ]
 
-        # UniFi OS first, then the classic controller endpoint.
-        for is_unifi_os, path in ((True, "/api/auth/login"), (False, "/api/login")):
-            status = await self._post(path, payload)
-            if status == 200:
-                self.is_unifi_os = is_unifi_os
-                return
-            if status in (400, 401, 403):
-                raise UnifiInvalidAuth
-            # 404 -> endpoint does not exist on this controller type, try next.
+    async def _get_all_pages(self, path: str) -> list[dict[str, Any]]:
+        """Fetch every page of a paginated list endpoint (offset/limit)."""
+        items: list[dict[str, Any]] = []
+        offset = 0
+        while True:
+            page = await self._request(
+                "GET", path, params={"offset": offset, "limit": PAGE_LIMIT}
+            )
+            items.extend(page["data"])
+            offset += page["count"]
+            if page["count"] == 0 or offset >= page["totalCount"]:
+                return items
 
-        raise UnifiCannotConnect
-
-    async def _post(self, path: str, payload: dict[str, Any]) -> int:
-        """Send a POST request and return the HTTP status code."""
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, Any] | None = None,
+        json: Any = None,
+    ) -> Any:
+        """Send a request and return the decoded JSON body."""
         try:
-            async with self._session.post(
+            async with self._session.request(
+                method,
                 f"{self._base_url}{path}",
-                json=payload,
+                headers=self._headers,
+                params=params,
+                json=json,
                 timeout=REQUEST_TIMEOUT,
             ) as response:
-                return response.status
+                if response.status in (401, 403):
+                    raise UnifiInvalidAuth(
+                        f"HTTP {response.status}: {await _error_message(response)}"
+                    )
+                if response.status >= 400:
+                    raise UnifiApiError(
+                        f"{method} {path} failed with HTTP {response.status}: "
+                        f"{await _error_message(response)}"
+                    )
+                if response.status == 204:
+                    return None
+                return await response.json()
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            # Never include the payload (password) in logs.
-            _LOGGER.debug("Error connecting to %s%s: %s", self._base_url, path, err)
+            # Headers (API key) are never logged.
+            _LOGGER.debug("Error requesting %s %s: %s", method, path, err)
             raise UnifiCannotConnect from err
 
 
-def async_create_api_client(hass: HomeAssistant, data: Mapping[str, Any]) -> UnifiApiClient:
-    """Create an API client with its own session for the given config data.
+async def _error_message(response: aiohttp.ClientResponse) -> str:
+    """Extract the message from the API's standard error body, if present."""
+    try:
+        body = await response.json(content_type=None)
+    except (aiohttp.ClientError, ValueError):
+        return ""
+    if isinstance(body, dict):
+        return f"{body.get('code', '')} {body.get('message', '')}".strip()
+    return ""
 
-    A dedicated session is used so the controller's auth cookie is not shared
-    with other integrations. ``unsafe=True`` allows cookies for IP hosts.
-    """
-    session = async_create_clientsession(
-        hass,
-        verify_ssl=data[CONF_VERIFY_SSL],
-        cookie_jar=aiohttp.CookieJar(unsafe=True),
-    )
+
+def async_create_api_client(
+    hass: HomeAssistant, data: Mapping[str, Any]
+) -> UnifiApiClient:
+    """Create an API client for the given config entry data."""
     return UnifiApiClient(
-        session=session,
+        session=async_get_clientsession(hass, verify_ssl=data[CONF_VERIFY_SSL]),
         host=data[CONF_HOST],
         port=data[CONF_PORT],
-        username=data[CONF_USERNAME],
-        password=data[CONF_PASSWORD],
+        api_key=data[CONF_API_KEY],
     )

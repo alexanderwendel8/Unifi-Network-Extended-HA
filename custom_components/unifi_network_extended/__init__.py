@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
+from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 
 from .api import (
     UnifiApiClient,
-    UnifiCannotConnect,
+    UnifiApiError,
     UnifiInvalidAuth,
     async_create_api_client,
 )
@@ -27,14 +27,14 @@ async def async_setup_entry(
     client = async_create_api_client(hass, entry.data)
 
     try:
-        await client.login()
+        await client.async_get_application_version()
     except UnifiInvalidAuth as err:
         # Triggers the reauth flow in the UI.
-        raise ConfigEntryAuthFailed("Invalid credentials") from err
-    except UnifiCannotConnect as err:
-        # Home Assistant retries the setup automatically.
+        raise ConfigEntryAuthFailed("Invalid API key") from err
+    except UnifiApiError as err:
+        # Includes UnifiCannotConnect. Home Assistant retries the setup automatically.
         raise ConfigEntryNotReady(
-            f"Cannot connect to {entry.data['host']}"
+            f"Cannot connect to {entry.data[CONF_HOST]}: {err}"
         ) from err
 
     entry.runtime_data = client

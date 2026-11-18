@@ -1,22 +1,17 @@
 """Tests for the UniFi Network Extended config flow."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from homeassistant import config_entries
-from homeassistant.const import (
-    CONF_HOST,
-    CONF_PASSWORD,
-    CONF_PORT,
-    CONF_USERNAME,
-    CONF_VERIFY_SSL,
-)
+from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.unifi_network_extended.api import (
+    UnifiApiError,
     UnifiCannotConnect,
     UnifiInvalidAuth,
 )
@@ -25,12 +20,14 @@ from custom_components.unifi_network_extended.const import DOMAIN
 USER_INPUT = {
     CONF_HOST: "192.168.1.1",
     CONF_PORT: 443,
-    CONF_USERNAME: "admin",
-    CONF_PASSWORD: "secret",
+    CONF_API_KEY: "secret-key",
     CONF_VERIFY_SSL: False,
 }
 
-LOGIN = "custom_components.unifi_network_extended.api.UnifiApiClient.login"
+VALIDATE = (
+    "custom_components.unifi_network_extended.api.UnifiApiClient"
+    ".async_get_application_version"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +48,7 @@ async def test_user_flow_success(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {}
 
-    with patch(LOGIN, new=AsyncMock()):
+    with patch(VALIDATE, return_value="9.1.0"):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], USER_INPUT
         )
@@ -65,6 +62,7 @@ async def test_user_flow_success(hass: HomeAssistant) -> None:
     [
         (UnifiInvalidAuth, "invalid_auth"),
         (UnifiCannotConnect, "cannot_connect"),
+        (UnifiApiError, "cannot_connect"),
         (RuntimeError, "unknown"),
     ],
 )
@@ -75,14 +73,14 @@ async def test_user_flow_errors(
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    with patch(LOGIN, side_effect=side_effect):
+    with patch(VALIDATE, side_effect=side_effect):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], USER_INPUT
         )
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": error}
 
-    with patch(LOGIN, new=AsyncMock()):
+    with patch(VALIDATE, return_value="9.1.0"):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], USER_INPUT
         )
@@ -104,20 +102,20 @@ async def test_user_flow_already_configured(hass: HomeAssistant) -> None:
 
 
 async def test_reauth_flow(hass: HomeAssistant) -> None:
-    """Test re-authentication updates the stored credentials."""
+    """Test re-authentication updates the stored API key."""
     entry = MockConfigEntry(domain=DOMAIN, data=USER_INPUT)
     entry.add_to_hass(hass)
 
     result = await entry.start_reauth_flow(hass)
     assert result["step_id"] == "reauth_confirm"
 
-    with patch(LOGIN, new=AsyncMock()):
+    with patch(VALIDATE, return_value="9.1.0"):
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {CONF_USERNAME: "admin", CONF_PASSWORD: "new"}
+            result["flow_id"], {CONF_API_KEY: " new-key "}
         )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
-    assert entry.data[CONF_PASSWORD] == "new"
+    assert entry.data[CONF_API_KEY] == "new-key"
 
 
 async def test_reconfigure_flow(hass: HomeAssistant) -> None:
@@ -128,7 +126,7 @@ async def test_reconfigure_flow(hass: HomeAssistant) -> None:
     result = await entry.start_reconfigure_flow(hass)
     assert result["step_id"] == "reconfigure"
 
-    with patch(LOGIN, new=AsyncMock()):
+    with patch(VALIDATE, return_value="9.1.0"):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {**USER_INPUT, CONF_PORT: 8443, CONF_VERIFY_SSL: True},

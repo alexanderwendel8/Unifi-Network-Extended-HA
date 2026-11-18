@@ -9,13 +9,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import (
-    CONF_HOST,
-    CONF_PASSWORD,
-    CONF_PORT,
-    CONF_USERNAME,
-    CONF_VERIFY_SSL,
-)
+from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_VERIFY_SSL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.selector import (
     NumberSelector,
@@ -26,7 +20,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
-from .api import UnifiCannotConnect, UnifiInvalidAuth, async_create_api_client
+from .api import UnifiApiError, UnifiInvalidAuth, async_create_api_client
 from .const import DEFAULT_PORT, DEFAULT_VERIFY_SSL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,27 +31,21 @@ PORT_SELECTOR = vol.All(
     ),
     vol.Coerce(int),
 )
-PASSWORD_SELECTOR = TextSelector(
-    TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="current-password")
-)
-USERNAME_SELECTOR = TextSelector(
-    TextSelectorConfig(type=TextSelectorType.TEXT, autocomplete="username")
+API_KEY_SELECTOR = TextSelector(
+    TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off")
 )
 
 
 def _connection_schema(defaults: Mapping[str, Any]) -> vol.Schema:
-    """Return the schema for the connection settings (without password default)."""
+    """Return the schema for the connection settings (without API key default)."""
     return vol.Schema(
         {
             vol.Required(CONF_HOST, default=defaults.get(CONF_HOST, vol.UNDEFINED)): str,
             vol.Required(
                 CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT)
             ): PORT_SELECTOR,
-            vol.Required(
-                CONF_USERNAME, default=defaults.get(CONF_USERNAME, vol.UNDEFINED)
-            ): USERNAME_SELECTOR,
-            # The password is never pre-filled in the UI.
-            vol.Required(CONF_PASSWORD): PASSWORD_SELECTOR,
+            # The API key is never pre-filled in the UI.
+            vol.Required(CONF_API_KEY): API_KEY_SELECTOR,
             vol.Required(
                 CONF_VERIFY_SSL,
                 default=defaults.get(CONF_VERIFY_SSL, DEFAULT_VERIFY_SSL),
@@ -66,19 +54,28 @@ def _connection_schema(defaults: Mapping[str, Any]) -> vol.Schema:
     )
 
 
+def _strip_input(user_input: dict[str, Any]) -> None:
+    """Remove surrounding whitespace, e.g. from a pasted API key."""
+    for key in (CONF_HOST, CONF_API_KEY):
+        if key in user_input:
+            user_input[key] = user_input[key].strip()
+
+
 async def _async_validate_input(
     hass: HomeAssistant, data: Mapping[str, Any]
 ) -> dict[str, str]:
-    """Try to log in with the given data and return form errors (empty = ok)."""
+    """Call GET /v1/info with the given data and return form errors (empty = ok)."""
     client = async_create_api_client(hass, data)
     try:
-        await client.login()
+        await client.async_get_application_version()
     except UnifiInvalidAuth:
         return {"base": "invalid_auth"}
-    except UnifiCannotConnect:
+    except UnifiApiError as err:
+        # Unreachable host, or no UniFi Network API at this address.
+        _LOGGER.debug("Validation failed: %s", err)
         return {"base": "cannot_connect"}
     except Exception:
-        _LOGGER.exception("Unexpected exception during login")
+        _LOGGER.exception("Unexpected exception while validating the API key")
         return {"base": "unknown"}
     return {}
 
@@ -96,7 +93,7 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            user_input[CONF_HOST] = user_input[CONF_HOST].strip()
+            _strip_input(user_input)
             self._async_abort_entries_match(
                 {CONF_HOST: user_input[CONF_HOST], CONF_PORT: user_input[CONF_PORT]}
             )
@@ -118,12 +115,12 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Allow changing host, port, credentials and SSL option via the UI."""
+        """Allow changing host, port, API key and SSL option via the UI."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            user_input[CONF_HOST] = user_input[CONF_HOST].strip()
+            _strip_input(user_input)
             errors = await _async_validate_input(self.hass, user_input)
             if not errors:
                 return self.async_update_reload_and_abort(
@@ -141,17 +138,18 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth(
         self, entry_data: Mapping[str, Any]
     ) -> ConfigFlowResult:
-        """Start re-authentication when the stored credentials stop working."""
+        """Start re-authentication when the stored API key stops working."""
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask for new credentials."""
+        """Ask for a new API key."""
         entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            _strip_input(user_input)
             errors = await _async_validate_input(
                 self.hass, {**entry.data, **user_input}
             )
@@ -163,12 +161,7 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_USERNAME, default=entry.data[CONF_USERNAME]
-                    ): USERNAME_SELECTOR,
-                    vol.Required(CONF_PASSWORD): PASSWORD_SELECTOR,
-                }
+                {vol.Required(CONF_API_KEY): API_KEY_SELECTOR}
             ),
             description_placeholders={CONF_HOST: entry.data[CONF_HOST]},
             errors=errors,
