@@ -1,0 +1,51 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit UniFi Network verbinden",
+        "description": "Gib die Verbindungsdaten deines UniFi Network Controllers ein.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "verify_ssl": "SSL-Zertifikat prüfen"
+        },
+        "data_description": {
+          "host": "Hostname oder IP-Adresse der UniFi-Konsole bzw. des Controllers.",
+          "port": "Meist 443 bei UniFi-OS-Konsolen oder 8443 bei einem selbst gehosteten Controller.",
+          "username": "Empfohlen ist ein lokales UniFi-Konto (ohne 2FA / UI.com-Konto).",
+          "verify_ssl": "Nur deaktivieren, wenn der Controller ein selbstsigniertes Zertifikat verwendet."
+        }
+      },
+      "reconfigure": {
+        "title": "UniFi Network neu konfigurieren",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "verify_ssl": "SSL-Zertifikat prüfen"
+        }
+      },
+      "reauth_confirm": {
+        "title": "UniFi Network erneut anmelden",
+        "description": "Die Zugangsdaten für {host} sind nicht mehr gültig. Bitte gib sie erneut ein.",
+        "data": {
+          "username": "Benutzername",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung fehlgeschlagen",
+      "invalid_auth": "Ungültige Anmeldedaten",
+      "unknown": "Unerwarteter Fehler"
+    },
+    "abort": {
+      "already_configured": "Dieser Controller ist bereits eingerichtet",
+      "reauth_successful": "Erneute Anmeldung erfolgreich",
+      "reconfigure_successful": "Neukonfiguration erfolgreich"
+    }
+  }
+}

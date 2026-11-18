@@ -1,0 +1,51 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to UniFi Network",
+        "description": "Enter the connection details of your UniFi Network controller.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Username",
+          "password": "Password",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "host": "Hostname or IP address of the UniFi console or controller.",
+          "port": "Usually 443 for UniFi OS consoles or 8443 for a self-hosted controller.",
+          "username": "A local UniFi account is recommended (no 2FA / UI.com account).",
+          "verify_ssl": "Disable only if the controller uses a self-signed certificate."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure UniFi Network",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "username": "Username",
+          "password": "Password",
+          "verify_ssl": "Verify SSL certificate"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate UniFi Network",
+        "description": "The credentials for {host} are no longer valid. Please enter them again.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Re-configuration was successful"
+    }
+  }
+}
