@@ -29,9 +29,15 @@ Ordner `custom_components/unifi_network_extended` nach
 | API-Schlüssel | Wird im Bereich *Integrationen* der UniFi Network Anwendung erzeugt |
 | SSL-Zertifikat prüfen | Nur bei selbstsignierten Zertifikaten deaktivieren |
 
-Der API-Schlüssel wird beim Einrichten mit einem Aufruf von `GET /v1/info` geprüft.
+Danach werden die Standorte (Sites) über `GET /v1/sites` abgerufen – das prüft
+zugleich den API-Schlüssel. Gibt es nur einen Standort, wird er automatisch
+übernommen, sonst wählst du ihn aus einer Liste. Pro Standort entsteht ein eigener
+Eintrag; für weitere Standorte die Integration einfach erneut hinzufügen
+(bereits eingerichtete Standorte werden nicht mehr angeboten).
+
+Beim Start prüft die Integration, ob der Standort noch existiert.
 Host, Port, API-Schlüssel und SSL-Option lassen sich später über
-*⋮ → Neu konfigurieren* ändern. Wird der API-Schlüssel ungültig, fordert
+*⋮ → Neu konfigurieren* ändern (der Standort bleibt dabei fest). Wird der API-Schlüssel ungültig, fordert
 Home Assistant automatisch einen neuen an.
 
 ## Speicherung des API-Schlüssels

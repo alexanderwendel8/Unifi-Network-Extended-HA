@@ -2,22 +2,39 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryError,
+    ConfigEntryNotReady,
+)
 
 from .api import (
     UnifiApiClient,
     UnifiApiError,
     UnifiInvalidAuth,
+    UnifiSite,
     async_create_api_client,
 )
+from .const import CONF_SITE_ID
 
 # Add platforms here once entities are implemented, e.g. Platform.SENSOR.
 PLATFORMS: list[Platform] = []
 
-type UnifiNetworkExtendedConfigEntry = ConfigEntry[UnifiApiClient]
+
+@dataclass(slots=True)
+class UnifiRuntimeData:
+    """Data kept in memory while the config entry is loaded."""
+
+    client: UnifiApiClient
+    site: UnifiSite
+
+
+type UnifiNetworkExtendedConfigEntry = ConfigEntry[UnifiRuntimeData]
 
 
 async def async_setup_entry(
@@ -27,7 +44,7 @@ async def async_setup_entry(
     client = async_create_api_client(hass, entry.data)
 
     try:
-        await client.async_get_application_version()
+        sites = await client.async_get_sites()
     except UnifiInvalidAuth as err:
         # Triggers the reauth flow in the UI.
         raise ConfigEntryAuthFailed("Invalid API key") from err
@@ -37,7 +54,12 @@ async def async_setup_entry(
             f"Cannot connect to {entry.data[CONF_HOST]}: {err}"
         ) from err
 
-    entry.runtime_data = client
+    site = next((site for site in sites if site.id == entry.data[CONF_SITE_ID]), None)
+    if site is None:
+        # Not retried: the site was deleted or the API key has no access to it.
+        raise ConfigEntryError(f"Site {entry.title} no longer exists")
+
+    entry.runtime_data = UnifiRuntimeData(client=client, site=site)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

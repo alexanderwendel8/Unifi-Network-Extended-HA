@@ -15,13 +15,17 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
     TextSelectorConfig,
     TextSelectorType,
 )
 
-from .api import UnifiApiError, UnifiInvalidAuth, async_create_api_client
-from .const import DEFAULT_PORT, DEFAULT_VERIFY_SSL, DOMAIN
+from .api import UnifiApiError, UnifiInvalidAuth, UnifiSite, async_create_api_client
+from .const import CONF_SITE_ID, DEFAULT_PORT, DEFAULT_VERIFY_SSL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,48 +65,69 @@ def _strip_input(user_input: dict[str, Any]) -> None:
             user_input[key] = user_input[key].strip()
 
 
-async def _async_validate_input(
+async def _async_fetch_sites(
     hass: HomeAssistant, data: Mapping[str, Any]
-) -> dict[str, str]:
-    """Call GET /v1/info with the given data and return form errors (empty = ok)."""
+) -> tuple[list[UnifiSite], dict[str, str]]:
+    """Validate the connection data and return (sites, form errors).
+
+    Uses GET /v1/sites, which also proves that the API key is valid.
+    """
     client = async_create_api_client(hass, data)
     try:
-        await client.async_get_application_version()
+        sites = await client.async_get_sites()
     except UnifiInvalidAuth:
-        return {"base": "invalid_auth"}
+        return [], {"base": "invalid_auth"}
     except UnifiApiError as err:
         # Unreachable host, or no UniFi Network API at this address.
         _LOGGER.debug("Validation failed: %s", err)
-        return {"base": "cannot_connect"}
+        return [], {"base": "cannot_connect"}
     except Exception:
         _LOGGER.exception("Unexpected exception while validating the API key")
-        return {"base": "unknown"}
-    return {}
+        return [], {"base": "unknown"}
+    return sites, {}
+
+
+async def _async_validate_site(
+    hass: HomeAssistant, data: Mapping[str, Any]
+) -> dict[str, str]:
+    """Validate the connection data and that the configured site still exists."""
+    sites, errors = await _async_fetch_sites(hass, data)
+    if not errors and all(site.id != data[CONF_SITE_ID] for site in sites):
+        errors = {"base": "site_not_found"}
+    return errors
 
 
 class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for UniFi Network Extended."""
+    """Handle a config flow for UniFi Network Extended.
+
+    One config entry is created per UniFi site; the site ID is the unique ID.
+    """
 
     VERSION = 1
     MINOR_VERSION = 1
 
+    def __init__(self) -> None:
+        """Initialize the flow."""
+        self._connection: dict[str, Any] = {}
+        self._sites: dict[str, UnifiSite] = {}
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial setup step in the UI."""
+        """Ask for the connection details."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             _strip_input(user_input)
-            self._async_abort_entries_match(
-                {CONF_HOST: user_input[CONF_HOST], CONF_PORT: user_input[CONF_PORT]}
-            )
-            errors = await _async_validate_input(self.hass, user_input)
+            sites, errors = await _async_fetch_sites(self.hass, user_input)
             if not errors:
-                return self.async_create_entry(
-                    title=f"UniFi Network ({user_input[CONF_HOST]})",
-                    data=user_input,
-                )
+                if not sites:
+                    return self.async_abort(reason="no_sites")
+                self._connection = user_input
+                self._sites = {site.id: site for site in sites}
+                if len(sites) == 1:
+                    return await self._async_create_site_entry(sites[0])
+                return await self.async_step_site()
 
         return self.async_show_form(
             step_id="user",
@@ -112,21 +137,64 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_site(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Let the user pick one of several sites."""
+        if user_input is not None:
+            return await self._async_create_site_entry(
+                self._sites[user_input[CONF_SITE_ID]]
+            )
+
+        configured = self._async_current_ids(include_ignore=False)
+        options = [
+            SelectOptionDict(value=site.id, label=site.name)
+            for site in sorted(self._sites.values(), key=lambda site: site.name)
+            if site.id not in configured
+        ]
+        if not options:
+            return self.async_abort(reason="already_configured")
+
+        return self.async_show_form(
+            step_id="site",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_SITE_ID): SelectSelector(
+                        SelectSelectorConfig(
+                            options=options, mode=SelectSelectorMode.DROPDOWN
+                        )
+                    )
+                }
+            ),
+        )
+
+    async def _async_create_site_entry(self, site: UnifiSite) -> ConfigFlowResult:
+        """Create the config entry for the chosen site."""
+        await self.async_set_unique_id(site.id)
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(
+            title=site.name,
+            data={**self._connection, CONF_SITE_ID: site.id},
+        )
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Allow changing host, port, API key and SSL option via the UI."""
+        """Allow changing host, port, API key and SSL option via the UI.
+
+        The site itself cannot be changed; add a new entry for another site.
+        """
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
 
         if user_input is not None:
             _strip_input(user_input)
-            errors = await _async_validate_input(self.hass, user_input)
+            errors = await _async_validate_site(
+                self.hass, {**user_input, CONF_SITE_ID: entry.data[CONF_SITE_ID]}
+            )
             if not errors:
                 return self.async_update_reload_and_abort(
-                    entry,
-                    title=f"UniFi Network ({user_input[CONF_HOST]})",
-                    data_updates=user_input,
+                    entry, data_updates=user_input
                 )
 
         return self.async_show_form(
@@ -150,9 +218,7 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             _strip_input(user_input)
-            errors = await _async_validate_input(
-                self.hass, {**entry.data, **user_input}
-            )
+            errors = await _async_validate_site(self.hass, {**entry.data, **user_input})
             if not errors:
                 return self.async_update_reload_and_abort(
                     entry, data_updates=user_input
@@ -160,9 +226,7 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema(
-                {vol.Required(CONF_API_KEY): API_KEY_SELECTOR}
-            ),
+            data_schema=vol.Schema({vol.Required(CONF_API_KEY): API_KEY_SELECTOR}),
             description_placeholders={CONF_HOST: entry.data[CONF_HOST]},
             errors=errors,
         )

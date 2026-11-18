@@ -14,8 +14,9 @@ from custom_components.unifi_network_extended.api import (
     UnifiApiError,
     UnifiCannotConnect,
     UnifiInvalidAuth,
+    UnifiSite,
 )
-from custom_components.unifi_network_extended.const import DOMAIN
+from custom_components.unifi_network_extended.const import CONF_SITE_ID, DOMAIN
 
 USER_INPUT = {
     CONF_HOST: "192.168.1.1",
@@ -23,10 +24,12 @@ USER_INPUT = {
     CONF_API_KEY: "secret-key",
     CONF_VERIFY_SSL: False,
 }
+DEFAULT_SITE = UnifiSite("site-default", "Default", "default")
+OFFICE_SITE = UnifiSite("site-office", "Office", "office")
+ENTRY_DATA = {**USER_INPUT, CONF_SITE_ID: DEFAULT_SITE.id}
 
-VALIDATE = (
-    "custom_components.unifi_network_extended.api.UnifiApiClient"
-    ".async_get_application_version"
+GET_SITES = (
+    "custom_components.unifi_network_extended.api.UnifiApiClient.async_get_sites"
 )
 
 
@@ -40,21 +43,71 @@ def mock_setup_entry():
         yield
 
 
-async def test_user_flow_success(hass: HomeAssistant) -> None:
-    """Test a successful setup through the UI."""
+def _entry(hass: HomeAssistant) -> MockConfigEntry:
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Default", unique_id=DEFAULT_SITE.id, data=ENTRY_DATA
+    )
+    entry.add_to_hass(hass)
+    return entry
+
+
+async def _start_user_flow(hass: HomeAssistant, sites: list[UnifiSite]) -> dict:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {}
-
-    with patch(VALIDATE, return_value="9.1.0"):
-        result = await hass.config_entries.flow.async_configure(
+    with patch(GET_SITES, return_value=sites):
+        return await hass.config_entries.flow.async_configure(
             result["flow_id"], USER_INPUT
         )
 
+
+async def test_single_site_is_selected_automatically(hass: HomeAssistant) -> None:
+    """With one site the entry is created without asking."""
+    result = await _start_user_flow(hass, [DEFAULT_SITE])
+
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"] == USER_INPUT
+    assert result["title"] == "Default"
+    assert result["data"] == ENTRY_DATA
+    assert result["result"].unique_id == DEFAULT_SITE.id
+
+
+async def test_multiple_sites_ask_for_selection(hass: HomeAssistant) -> None:
+    """With several sites the user picks one."""
+    result = await _start_user_flow(hass, [OFFICE_SITE, DEFAULT_SITE])
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "site"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_SITE_ID: OFFICE_SITE.id}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Office"
+    assert result["data"] == {**USER_INPUT, CONF_SITE_ID: OFFICE_SITE.id}
+
+
+async def test_configured_sites_are_not_offered(hass: HomeAssistant) -> None:
+    """Already configured sites are hidden from the selection."""
+    _entry(hass)
+    result = await _start_user_flow(hass, [DEFAULT_SITE, OFFICE_SITE])
+
+    options = result["data_schema"].schema[CONF_SITE_ID].config["options"]
+    assert [option["value"] for option in options] == [OFFICE_SITE.id]
+
+
+async def test_all_sites_configured_aborts(hass: HomeAssistant) -> None:
+    """Abort when every site of the controller is already configured."""
+    _entry(hass)
+    result = await _start_user_flow(hass, [DEFAULT_SITE])
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_no_sites_aborts(hass: HomeAssistant) -> None:
+    """Abort when the API key sees no sites."""
+    result = await _start_user_flow(hass, [])
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "no_sites"
 
 
 @pytest.mark.parametrize(
@@ -73,43 +126,28 @@ async def test_user_flow_errors(
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    with patch(VALIDATE, side_effect=side_effect):
+    with patch(GET_SITES, side_effect=side_effect):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], USER_INPUT
         )
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": error}
 
-    with patch(VALIDATE, return_value="9.1.0"):
+    with patch(GET_SITES, return_value=[DEFAULT_SITE]):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], USER_INPUT
         )
     assert result["type"] is FlowResultType.CREATE_ENTRY
 
 
-async def test_user_flow_already_configured(hass: HomeAssistant) -> None:
-    """Test that the same host/port cannot be added twice."""
-    MockConfigEntry(domain=DOMAIN, data=USER_INPUT).add_to_hass(hass)
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], USER_INPUT
-    )
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "already_configured"
-
-
 async def test_reauth_flow(hass: HomeAssistant) -> None:
     """Test re-authentication updates the stored API key."""
-    entry = MockConfigEntry(domain=DOMAIN, data=USER_INPUT)
-    entry.add_to_hass(hass)
+    entry = _entry(hass)
 
     result = await entry.start_reauth_flow(hass)
     assert result["step_id"] == "reauth_confirm"
 
-    with patch(VALIDATE, return_value="9.1.0"):
+    with patch(GET_SITES, return_value=[DEFAULT_SITE]):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_API_KEY: " new-key "}
         )
@@ -118,15 +156,28 @@ async def test_reauth_flow(hass: HomeAssistant) -> None:
     assert entry.data[CONF_API_KEY] == "new-key"
 
 
+async def test_reauth_site_missing(hass: HomeAssistant) -> None:
+    """A key without access to the configured site is rejected."""
+    entry = _entry(hass)
+
+    result = await entry.start_reauth_flow(hass)
+    with patch(GET_SITES, return_value=[OFFICE_SITE]):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_API_KEY: "other-key"}
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "site_not_found"}
+    assert entry.data[CONF_API_KEY] == "secret-key"
+
+
 async def test_reconfigure_flow(hass: HomeAssistant) -> None:
-    """Test reconfiguring the connection settings."""
-    entry = MockConfigEntry(domain=DOMAIN, data=USER_INPUT)
-    entry.add_to_hass(hass)
+    """Test reconfiguring the connection settings keeps the site."""
+    entry = _entry(hass)
 
     result = await entry.start_reconfigure_flow(hass)
     assert result["step_id"] == "reconfigure"
 
-    with patch(VALIDATE, return_value="9.1.0"):
+    with patch(GET_SITES, return_value=[DEFAULT_SITE]):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {**USER_INPUT, CONF_PORT: 8443, CONF_VERIFY_SSL: True},
@@ -135,3 +186,17 @@ async def test_reconfigure_flow(hass: HomeAssistant) -> None:
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_PORT] == 8443
     assert entry.data[CONF_VERIFY_SSL] is True
+    assert entry.data[CONF_SITE_ID] == DEFAULT_SITE.id
+
+
+async def test_reconfigure_site_missing(hass: HomeAssistant) -> None:
+    """Reconfiguring to a controller without the site is rejected."""
+    entry = _entry(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(GET_SITES, return_value=[OFFICE_SITE]):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**USER_INPUT, CONF_HOST: "10.0.0.1"}
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "site_not_found"}

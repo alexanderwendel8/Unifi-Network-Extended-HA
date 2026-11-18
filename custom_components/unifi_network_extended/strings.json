@@ -17,6 +17,13 @@
           "verify_ssl": "Disable only if the controller uses a self-signed certificate."
         }
       },
+      "site": {
+        "title": "Select site",
+        "description": "The UniFi Network application manages several sites. Select the site to add. Add the integration again for further sites.",
+        "data": {
+          "site_id": "Site"
+        }
+      },
       "reconfigure": {
         "title": "Reconfigure UniFi Network",
         "data": {
@@ -37,12 +44,14 @@
     "error": {
       "cannot_connect": "Failed to connect",
       "invalid_auth": "Invalid API key",
-      "unknown": "Unexpected error"
+      "unknown": "Unexpected error",
+      "site_not_found": "The configured site no longer exists or the API key has no access to it."
     },
     "abort": {
-      "already_configured": "Device is already configured",
+      "already_configured": "This site is already configured",
       "reauth_successful": "Re-authentication was successful",
-      "reconfigure_successful": "Re-configuration was successful"
+      "reconfigure_successful": "Re-configuration was successful",
+      "no_sites": "No sites were found for this API key."
     }
   }
 }

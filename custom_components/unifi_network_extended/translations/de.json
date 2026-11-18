@@ -17,6 +17,13 @@
           "verify_ssl": "Nur deaktivieren, wenn der Controller ein selbstsigniertes Zertifikat verwendet."
         }
       },
+      "site": {
+        "title": "Standort auswählen",
+        "description": "Die UniFi Network Anwendung verwaltet mehrere Standorte. Wähle den Standort, der hinzugefügt werden soll. Für weitere Standorte die Integration erneut hinzufügen.",
+        "data": {
+          "site_id": "Standort"
+        }
+      },
       "reconfigure": {
         "title": "UniFi Network neu konfigurieren",
         "data": {
@@ -37,12 +44,14 @@
     "error": {
       "cannot_connect": "Verbindung fehlgeschlagen",
       "invalid_auth": "Ungültiger API-Schlüssel",
-      "unknown": "Unerwarteter Fehler"
+      "unknown": "Unerwarteter Fehler",
+      "site_not_found": "Der eingerichtete Standort existiert nicht mehr oder der API-Schlüssel hat keinen Zugriff darauf."
     },
     "abort": {
-      "already_configured": "Dieser Controller ist bereits eingerichtet",
+      "already_configured": "Dieser Standort ist bereits eingerichtet",
       "reauth_successful": "Erneute Anmeldung erfolgreich",
-      "reconfigure_successful": "Neukonfiguration erfolgreich"
+      "reconfigure_successful": "Neukonfiguration erfolgreich",
+      "no_sites": "Für diesen API-Schlüssel wurden keine Standorte gefunden."
     }
   }
 }
