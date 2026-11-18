@@ -126,10 +126,12 @@ def mock_api() -> Generator[dict[str, AsyncMock]]:
         patch(
             f"{API}.async_get_device_statistics", return_value=GATEWAY_STATS
         ) as statistics,
+        patch(f"{API}.async_restart_device", return_value=None) as restart,
     ):
         yield {
             "sites": sites,
             "devices": devices,
             "clients": clients,
             "statistics": statistics,
+            "restart": restart,
         }

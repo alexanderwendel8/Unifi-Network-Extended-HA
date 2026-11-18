@@ -199,6 +199,19 @@ class UnifiApiClient:
             )
         )
 
+    async def async_restart_device(self, site_id: str, device_id: str) -> None:
+        """Restart an adopted device.
+
+        ``POST /v1/sites/{siteId}/devices/{deviceId}/actions``
+        with the "Device restart request" body ``{"action": "RESTART"}``.
+        """
+        await self._request(
+            "POST",
+            f"/v1/sites/{site_id}/devices/{device_id}/actions",
+            json={"action": "RESTART"},
+            expect_body=False,
+        )
+
     async def _get_all_pages(self, path: str) -> list[dict[str, Any]]:
         """Fetch every page of a paginated list endpoint (offset/limit)."""
         items: list[dict[str, Any]] = []
@@ -219,8 +232,13 @@ class UnifiApiClient:
         *,
         params: Mapping[str, Any] | None = None,
         json: Any = None,
+        expect_body: bool = True,
     ) -> Any:
-        """Send a request and return the decoded JSON body."""
+        """Send a request and return the decoded JSON body.
+
+        With ``expect_body=False`` the body is ignored (e.g. actions that only
+        answer with HTTP 200 and no documented content).
+        """
         try:
             async with self._session.request(
                 method,
@@ -239,7 +257,7 @@ class UnifiApiClient:
                         f"{method} {path} failed with HTTP {response.status}: "
                         f"{await _error_message(response)}"
                     )
-                if response.status == 204:
+                if response.status == 204 or not expect_body:
                     return None
                 return await response.json()
         except (TimeoutError, aiohttp.ClientError) as err:

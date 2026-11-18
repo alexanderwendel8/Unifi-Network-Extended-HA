@@ -30,6 +30,7 @@ from .coordinator import UnifiSiteCoordinator, UnifiStatisticsCoordinator
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
     Platform.DEVICE_TRACKER,
     Platform.SENSOR,
 ]
