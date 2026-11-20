@@ -66,6 +66,13 @@ erhalten ihre Entitäten automatisch, ohne Neustart.
   Alle anderen Tracker sind vorhanden, aber deaktiviert und lassen sich einzeln
   einschalten.
 
+## Symbole
+
+Das Integrationslogo liegt unter `custom_components/unifi_network_extended/brand/`
+und wird ab Home Assistant 2026.3 für die Integration und ihre Geräte angezeigt
+(ältere Versionen zeigen einen Platzhalter). Es ist ein eigenes Motiv und nicht
+das UniFi-Logo von Ubiquiti. Die Entitäts-Icons sind in `icons.json` hinterlegt.
+
 ## Aktualisierung und Optionen
 
 Die offizielle UniFi Network API bietet keine Push-Benachrichtigungen
