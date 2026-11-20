@@ -1,0 +1,69 @@
+{
+  "entity": {
+    "sensor": {
+      "clients": {
+        "default": "mdi:devices"
+      },
+      "clients_wired": {
+        "default": "mdi:ethernet"
+      },
+      "clients_wireless": {
+        "default": "mdi:wifi"
+      },
+      "clients_vpn": {
+        "default": "mdi:vpn"
+      },
+      "clients_guest": {
+        "default": "mdi:account-group"
+      },
+      "devices": {
+        "default": "mdi:router-network"
+      },
+      "device_state": {
+        "default": "mdi:help-network",
+        "state": {
+          "online": "mdi:check-network",
+          "offline": "mdi:close-network",
+          "pending_adoption": "mdi:plus-network",
+          "updating": "mdi:update",
+          "getting_ready": "mdi:timer-sand",
+          "adopting": "mdi:plus-network",
+          "deleting": "mdi:minus-network",
+          "connection_interrupted": "mdi:alert-network",
+          "isolated": "mdi:lan-disconnect",
+          "u5g_incorrect_topology": "mdi:alert-network"
+        }
+      },
+      "ip_address": {
+        "default": "mdi:ip-network"
+      },
+      "firmware_version": {
+        "default": "mdi:package-variant-closed"
+      },
+      "cpu_utilization": {
+        "default": "mdi:cpu-64-bit"
+      },
+      "memory_utilization": {
+        "default": "mdi:memory"
+      },
+      "uplink_rx_rate": {
+        "default": "mdi:download-network"
+      },
+      "uplink_tx_rate": {
+        "default": "mdi:upload-network"
+      },
+      "load_average_1min": {
+        "default": "mdi:gauge"
+      },
+      "load_average_5min": {
+        "default": "mdi:gauge"
+      },
+      "load_average_15min": {
+        "default": "mdi:gauge"
+      },
+      "uptime": {
+        "default": "mdi:restart"
+      }
+    }
+  }
+}
