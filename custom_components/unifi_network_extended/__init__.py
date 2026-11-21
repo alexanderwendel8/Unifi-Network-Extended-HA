@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
@@ -105,8 +106,6 @@ async def async_setup_entry(
         site_coordinator,
         entry.options.get(CONF_STATISTICS_INTERVAL, DEFAULT_STATISTICS_INTERVAL),
     )
-    await statistics_coordinator.async_config_entry_first_refresh()
-
     # Ports need the device details, one request per device like the statistics.
     ports_coordinator = UnifiPortsCoordinator(
         hass,
@@ -114,7 +113,6 @@ async def async_setup_entry(
         site_coordinator,
         entry.options.get(CONF_STATISTICS_INTERVAL, DEFAULT_STATISTICS_INTERVAL),
     )
-    await ports_coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = UnifiRuntimeData(
         client=client,
@@ -126,7 +124,30 @@ async def async_setup_entry(
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Statistics and ports need one request per device. Load them in parallel in
+    # the background instead of delaying the setup: their entities show up as
+    # unavailable (statistics) or are added (ports) once the data has arrived.
+    entry.async_create_background_task(
+        hass,
+        _async_load_device_data(statistics_coordinator, ports_coordinator),
+        f"{DOMAIN} {site.name} initial device data",
+    )
     return True
+
+
+async def _async_load_device_data(
+    statistics_coordinator: UnifiStatisticsCoordinator,
+    ports_coordinator: UnifiPortsCoordinator,
+) -> None:
+    """Run the first refresh of the per-device coordinators in parallel.
+
+    Errors are handled by the coordinators (logged, entities unavailable, reauth
+    on an invalid API key) and retried at the next interval.
+    """
+    await asyncio.gather(
+        statistics_coordinator.async_refresh(), ports_coordinator.async_refresh()
+    )
 
 
 async def _async_options_updated(

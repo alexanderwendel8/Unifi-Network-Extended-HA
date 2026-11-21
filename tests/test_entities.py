@@ -33,7 +33,7 @@ from .conftest import ACCESS_POINT, GATEWAY, NAS, PHONE, SITE, VPN_USER
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 def _state(hass: HomeAssistant, unique_id: str, domain: str = "sensor") -> str:

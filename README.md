@@ -66,7 +66,10 @@ Home Assistant automatisch einen neuen an.
 PoE lässt sich über die offizielle API nicht dauerhaft ein- oder ausschalten, und
 die Leistungsaufnahme wird nicht geliefert.
 
-Statistik- und Portwerte gibt es nur für Geräte, die online sind. Neu adoptierte Geräte
+Statistik- und Portwerte gibt es nur für Geräte, die online sind.
+Sie werden nach dem Start im Hintergrund geladen; bis dahin sind die
+Statistik-Sensoren kurz nicht verfügbar und die Port-Entitäten erscheinen,
+sobald ihre Daten da sind. Neu adoptierte Geräte
 erhalten ihre Entitäten automatisch, ohne Neustart.
 
 **Clients** (Device-Tracker)

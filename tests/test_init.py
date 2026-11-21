@@ -1,5 +1,6 @@
 """Tests for setting up and unloading a config entry."""
 
+import asyncio
 from dataclasses import replace
 from unittest.mock import AsyncMock
 
@@ -25,6 +26,7 @@ async def test_setup_and_unload(
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     assert config_entry.state is ConfigEntryState.LOADED
     assert config_entry.runtime_data.site == SITE
+    await hass.async_block_till_done(wait_background_tasks=True)
     # Statistics are only requested for online devices.
     mock_api["statistics"].assert_awaited_once_with(SITE.id, "dev-gw")
 
@@ -40,11 +42,9 @@ async def test_setup_and_unload(
         ("sites", {"return_value": []}, ConfigEntryState.SETUP_ERROR),
         ("devices", {"side_effect": UnifiCannotConnect}, ConfigEntryState.SETUP_RETRY),
         ("clients", {"side_effect": UnifiInvalidAuth}, ConfigEntryState.SETUP_ERROR),
-        (
-            "statistics",
-            {"side_effect": UnifiCannotConnect},
-            ConfigEntryState.SETUP_RETRY,
-        ),
+        # Statistics and ports load in the background and do not block the setup.
+        ("statistics", {"side_effect": UnifiCannotConnect}, ConfigEntryState.LOADED),
+        ("ports", {"side_effect": UnifiCannotConnect}, ConfigEntryState.LOADED),
     ],
 )
 async def test_setup_failures(
@@ -84,6 +84,33 @@ async def test_statistics_partial_failure(
 
     mock_api["statistics"].side_effect = statistics
     assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert config_entry.runtime_data.statistics_coordinator.data == {
         GATEWAY.id: GATEWAY_STATS
     }
+
+
+async def test_setup_does_not_wait_for_device_data(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
+    """Statistics and ports are loaded in parallel after the setup finished."""
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_statistics(site_id: str, device_id: str) -> UnifiDeviceStatistics:
+        started.set()
+        await release.wait()
+        return GATEWAY_STATS
+
+    mock_api["statistics"].side_effect = slow_statistics
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    assert config_entry.state is ConfigEntryState.LOADED
+    await started.wait()
+    # Ports were fetched while the statistics were still pending.
+    mock_api["ports"].assert_awaited_once()
+    assert config_entry.runtime_data.statistics_coordinator.data == {}
+    assert hass.states.get("sensor.gateway_cpu_utilization").state == "unavailable"
+
+    release.set()
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.states.get("sensor.gateway_cpu_utilization").state == "12.5"

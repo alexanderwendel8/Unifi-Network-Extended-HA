@@ -15,6 +15,7 @@ async def test_diagnostics_redacts_secrets(
 ) -> None:
     """API key, host and client details are not part of the diagnostics."""
     assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     diagnostics = await async_get_config_entry_diagnostics(hass, config_entry)
 
