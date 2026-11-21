@@ -13,6 +13,8 @@ from custom_components.unifi_network_extended.api import (
     UnifiClient,
     UnifiDevice,
     UnifiDeviceStatistics,
+    UnifiPort,
+    UnifiPortPoe,
     UnifiSite,
 )
 from custom_components.unifi_network_extended.const import CONF_SITE_ID, DOMAIN
@@ -28,8 +30,37 @@ GATEWAY = UnifiDevice(
     state="ONLINE",
     firmware_version="4.1.13",
     firmware_updatable=True,
-    features=frozenset({"gateway"}),
+    features=frozenset({"gateway", "switching"}),
+    interfaces=frozenset({"ports"}),
 )
+
+# Gateway ports: 1 = PoE camera (up), 2 = PoE disabled, 3 = SFP+ without PoE.
+GATEWAY_PORTS = {
+    1: UnifiPort(
+        idx=1,
+        state="UP",
+        connector="RJ45",
+        max_speed_mbps=2500,
+        speed_mbps=1000,
+        poe=UnifiPortPoe(enabled=True, state="UP", standard="802.3at", type=2),
+    ),
+    2: UnifiPort(
+        idx=2,
+        state="DOWN",
+        connector="RJ45",
+        max_speed_mbps=2500,
+        speed_mbps=None,
+        poe=UnifiPortPoe(enabled=False, state="DOWN", standard="802.3at", type=2),
+    ),
+    3: UnifiPort(
+        idx=3,
+        state="UP",
+        connector="SFPPLUS",
+        max_speed_mbps=10000,
+        speed_mbps=10000,
+        poe=None,
+    ),
+}
 ACCESS_POINT = UnifiDevice(
     id="dev-ap",
     name="Access Point",
@@ -127,6 +158,8 @@ def mock_api() -> Generator[dict[str, AsyncMock]]:
             f"{API}.async_get_device_statistics", return_value=GATEWAY_STATS
         ) as statistics,
         patch(f"{API}.async_restart_device", return_value=None) as restart,
+        patch(f"{API}.async_get_device_ports", return_value=GATEWAY_PORTS) as ports,
+        patch(f"{API}.async_power_cycle_port", return_value=None) as power_cycle,
     ):
         yield {
             "sites": sites,
@@ -134,4 +167,6 @@ def mock_api() -> Generator[dict[str, AsyncMock]]:
             "clients": clients,
             "statistics": statistics,
             "restart": restart,
+            "ports": ports,
+            "power_cycle": power_cycle,
         }

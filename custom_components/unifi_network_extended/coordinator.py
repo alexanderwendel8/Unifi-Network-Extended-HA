@@ -22,6 +22,7 @@ from .api import (
     UnifiDevice,
     UnifiDeviceStatistics,
     UnifiInvalidAuth,
+    UnifiPort,
     UnifiSite,
 )
 from .const import DOMAIN, STATISTICS_PARALLEL_REQUESTS
@@ -90,16 +91,16 @@ class UnifiSiteCoordinator(DataUpdateCoordinator[UnifiSiteData]):
         )
 
 
-class UnifiStatisticsCoordinator(
-    DataUpdateCoordinator[dict[str, UnifiDeviceStatistics]]
-):
-    """Polls the latest statistics of every online device.
+class _UnifiPerDeviceCoordinator[DataT](DataUpdateCoordinator[dict[str, DataT]]):
+    """Polls data that needs one request per device.
 
-    The API needs one request per device, so this runs less often than the
-    site coordinator and limits the number of parallel requests.
+    Runs less often than the site coordinator and limits the number of parallel
+    requests. A failing device is skipped; only a total failure marks the update
+    as failed.
     """
 
     config_entry: UnifiNetworkExtendedConfigEntry
+    _kind: str
 
     def __init__(
         self,
@@ -113,46 +114,80 @@ class UnifiStatisticsCoordinator(
             hass,
             _LOGGER,
             config_entry=entry,
-            name=f"{DOMAIN} {site_coordinator.site.name} statistics",
+            name=f"{DOMAIN} {site_coordinator.site.name} {self._kind}",
             update_interval=timedelta(seconds=interval),
         )
-        self._site_coordinator = site_coordinator
+        self.site_coordinator = site_coordinator
         self._semaphore = asyncio.Semaphore(STATISTICS_PARALLEL_REQUESTS)
 
-    async def _async_update_data(self) -> dict[str, UnifiDeviceStatistics]:
-        """Fetch statistics for all online devices.
+    def _include_device(self, device: UnifiDevice) -> bool:
+        """Return True if data should be fetched for this device."""
+        return device.state == "ONLINE"
 
-        A failing device is skipped; only a total failure marks the update failed.
-        """
-        client = self._site_coordinator.client
-        site_id = self._site_coordinator.site.id
+    async def _async_fetch(self, site_id: str, device_id: str) -> DataT:
+        """Fetch the data of one device."""
+        raise NotImplementedError
+
+    async def _async_update_data(self) -> dict[str, DataT]:
+        """Fetch the data of all included devices."""
+        site_id = self.site_coordinator.site.id
         device_ids = [
             device.id
-            for device in self._site_coordinator.data.devices.values()
-            if device.state == "ONLINE"
+            for device in self.site_coordinator.data.devices.values()
+            if self._include_device(device)
         ]
 
-        async def fetch(device_id: str) -> UnifiDeviceStatistics:
+        async def fetch(device_id: str) -> DataT:
             async with self._semaphore:
-                return await client.async_get_device_statistics(site_id, device_id)
+                return await self._async_fetch(site_id, device_id)
 
         results = await asyncio.gather(
             *(fetch(device_id) for device_id in device_ids), return_exceptions=True
         )
 
-        statistics: dict[str, UnifiDeviceStatistics] = {}
+        data: dict[str, DataT] = {}
         errors: list[BaseException] = []
         for device_id, result in zip(device_ids, results, strict=True):
-            if isinstance(result, UnifiDeviceStatistics):
-                statistics[device_id] = result
-            elif isinstance(result, UnifiInvalidAuth):
+            if isinstance(result, UnifiInvalidAuth):
                 raise ConfigEntryAuthFailed(str(result)) from result
-            elif isinstance(result, UnifiApiError):
-                _LOGGER.debug("Statistics for device %s failed: %s", device_id, result)
+            if isinstance(result, UnifiApiError):
+                _LOGGER.debug(
+                    "Fetching %s of device %s failed: %s", self._kind, device_id, result
+                )
                 errors.append(result)
-            else:
+            elif isinstance(result, BaseException):
                 raise result
+            else:
+                data[device_id] = result
 
-        if device_ids and not statistics:
-            raise UpdateFailed(f"Fetching device statistics failed: {errors[0]}")
-        return statistics
+        if device_ids and not data:
+            raise UpdateFailed(f"Fetching device {self._kind} failed: {errors[0]}")
+        return data
+
+
+class UnifiStatisticsCoordinator(_UnifiPerDeviceCoordinator[UnifiDeviceStatistics]):
+    """Polls the latest statistics of every online device."""
+
+    _kind = "statistics"
+
+    async def _async_fetch(self, site_id: str, device_id: str) -> UnifiDeviceStatistics:
+        """Fetch the latest statistics of a device."""
+        return await self.site_coordinator.client.async_get_device_statistics(
+            site_id, device_id
+        )
+
+
+class UnifiPortsCoordinator(_UnifiPerDeviceCoordinator[dict[int, UnifiPort]]):
+    """Polls the physical ports (link, speed, PoE) of every online device with ports."""
+
+    _kind = "ports"
+
+    def _include_device(self, device: UnifiDevice) -> bool:
+        """Only devices that report physical ports."""
+        return super()._include_device(device) and "ports" in device.interfaces
+
+    async def _async_fetch(self, site_id: str, device_id: str) -> dict[int, UnifiPort]:
+        """Fetch the ports of a device."""
+        return await self.site_coordinator.client.async_get_device_ports(
+            site_id, device_id
+        )

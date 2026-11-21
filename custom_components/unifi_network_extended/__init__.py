@@ -28,7 +28,11 @@ from .const import (
     DEFAULT_STATISTICS_INTERVAL,
     DOMAIN,
 )
-from .coordinator import UnifiSiteCoordinator, UnifiStatisticsCoordinator
+from .coordinator import (
+    UnifiPortsCoordinator,
+    UnifiSiteCoordinator,
+    UnifiStatisticsCoordinator,
+)
 from .entity import MANUFACTURER, SITE_MODEL
 
 PLATFORMS: list[Platform] = [
@@ -47,6 +51,7 @@ class UnifiRuntimeData:
     site: UnifiSite
     site_coordinator: UnifiSiteCoordinator
     statistics_coordinator: UnifiStatisticsCoordinator
+    ports_coordinator: UnifiPortsCoordinator
 
 
 type UnifiNetworkExtendedConfigEntry = ConfigEntry[UnifiRuntimeData]
@@ -102,11 +107,21 @@ async def async_setup_entry(
     )
     await statistics_coordinator.async_config_entry_first_refresh()
 
+    # Ports need the device details, one request per device like the statistics.
+    ports_coordinator = UnifiPortsCoordinator(
+        hass,
+        entry,
+        site_coordinator,
+        entry.options.get(CONF_STATISTICS_INTERVAL, DEFAULT_STATISTICS_INTERVAL),
+    )
+    await ports_coordinator.async_config_entry_first_refresh()
+
     entry.runtime_data = UnifiRuntimeData(
         client=client,
         site=site,
         site_coordinator=site_coordinator,
         statistics_coordinator=statistics_coordinator,
+        ports_coordinator=ports_coordinator,
     )
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))

@@ -168,3 +168,77 @@ async def test_restart_device(
     assert url.path == "/proxy/network/integration/v1/sites/s1/devices/d1/actions"
     assert body == {"action": "RESTART"}
     assert headers["X-API-KEY"] == "key"
+
+
+async def test_get_device_ports(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Ports are read from the device details."""
+    aioclient_mock.get(
+        f"{BASE}/v1/sites/s1/devices/d1",
+        json={
+            "id": "d1",
+            "name": "Switch",
+            "interfaces": {
+                "ports": [
+                    {
+                        "idx": 1,
+                        "state": "UP",
+                        "connector": "RJ45",
+                        "maxSpeedMbps": 2500,
+                        "speedMbps": 1000,
+                        "poe": {
+                            "enabled": True,
+                            "state": "UP",
+                            "standard": "802.3bt",
+                            "type": 3,
+                        },
+                    },
+                    {
+                        "idx": 9,
+                        "state": "DOWN",
+                        "connector": "SFPPLUS",
+                        "maxSpeedMbps": 10000,
+                    },
+                ]
+            },
+        },
+    )
+
+    ports = await _client(hass).async_get_device_ports("s1", "d1")
+
+    assert set(ports) == {1, 9}
+    assert ports[1].speed_mbps == 1000
+    assert ports[1].poe.enabled is True
+    assert ports[1].poe.standard == "802.3bt"
+    assert ports[1].poe.type == 3
+    assert ports[9].speed_mbps is None
+    assert ports[9].poe is None
+
+
+async def test_get_device_ports_without_ports(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Devices without ports (e.g. access points) return an empty dict."""
+    aioclient_mock.get(
+        f"{BASE}/v1/sites/s1/devices/d1",
+        json={"id": "d1", "interfaces": {"radios": []}},
+    )
+    assert await _client(hass).async_get_device_ports("s1", "d1") == {}
+
+
+async def test_power_cycle_port(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """The power-cycle action is posted to the port actions endpoint."""
+    aioclient_mock.post(
+        f"{BASE}/v1/sites/s1/devices/d1/interfaces/ports/4/actions", status=200
+    )
+
+    await _client(hass).async_power_cycle_port("s1", "d1", 4)
+
+    _, url, body, _ = aioclient_mock.mock_calls[0]
+    assert url.path == (
+        "/proxy/network/integration/v1/sites/s1/devices/d1/interfaces/ports/4/actions"
+    )
+    assert body == {"action": "POWER_CYCLE"}

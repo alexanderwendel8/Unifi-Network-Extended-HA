@@ -60,12 +60,12 @@
         "title": "Optionen",
         "data": {
           "scan_interval": "Abrufintervall für Geräte und Clients",
-          "statistics_interval": "Abrufintervall für Gerätestatistik",
+          "statistics_interval": "Abrufintervall für Gerätestatistik und Ports",
           "track_clients": "Clients verfolgen"
         },
         "data_description": {
           "scan_interval": "Die UniFi Network API bietet keine Push-Updates, die Daten werden abgefragt. Mindestens 10 s.",
-          "statistics_interval": "Benötigt eine Anfrage pro Gerät. Mindestens 30 s.",
+          "statistics_interval": "Benötigt eine Anfrage pro Gerät für die Statistik und eine pro Switch für die Ports. Mindestens 30 s.",
           "track_clients": "Legt für jeden kabelgebundenen oder WLAN-Client einen Device-Tracker an. Beim Deaktivieren werden die Tracker entfernt."
         }
       }
@@ -75,6 +75,12 @@
     "binary_sensor": {
       "firmware_update": {
         "name": "Firmware-Update"
+      },
+      "port_link": {
+        "name": "Port {port} Verbindung"
+      },
+      "port_poe_enabled": {
+        "name": "Port {port} PoE aktiviert"
       }
     },
     "sensor": {
@@ -140,6 +146,42 @@
       },
       "uptime": {
         "name": "Letzter Neustart"
+      },
+      "port_link_speed": {
+        "name": "Port {port} Geschwindigkeit"
+      },
+      "port_max_speed": {
+        "name": "Port {port} maximale Geschwindigkeit"
+      },
+      "port_connector": {
+        "name": "Port {port} Anschluss",
+        "state": {
+          "rj45": "RJ45",
+          "sfp": "SFP",
+          "sfpplus": "SFP+",
+          "sfp28": "SFP28",
+          "qsfp28": "QSFP28"
+        }
+      },
+      "port_poe_state": {
+        "name": "Port {port} PoE",
+        "state": {
+          "up": "Liefert Strom",
+          "down": "Aus",
+          "limited": "Begrenzt",
+          "unknown": "Unbekannt"
+        }
+      },
+      "port_poe_standard": {
+        "name": "Port {port} PoE-Standard"
+      },
+      "port_poe_type": {
+        "name": "Port {port} PoE-Typ"
+      }
+    },
+    "button": {
+      "port_poe_power_cycle": {
+        "name": "Port {port} PoE neu starten"
       }
     }
   },
@@ -149,6 +191,9 @@
     },
     "restart_failed": {
       "message": "Neustart von {device} fehlgeschlagen: {error}"
+    },
+    "power_cycle_failed": {
+      "message": "PoE-Neustart von Port {port} an {device} fehlgeschlagen: {error}"
     }
   }
 }
