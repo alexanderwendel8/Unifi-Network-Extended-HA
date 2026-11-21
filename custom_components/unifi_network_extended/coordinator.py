@@ -52,6 +52,7 @@ class UnifiSiteCoordinator(DataUpdateCoordinator[UnifiSiteData]):
         entry: UnifiNetworkExtendedConfigEntry,
         client: UnifiApiClient,
         site: UnifiSite,
+        site_device_id: str,
         interval: int,
     ) -> None:
         """Initialize the coordinator."""
@@ -64,6 +65,8 @@ class UnifiSiteCoordinator(DataUpdateCoordinator[UnifiSiteData]):
         )
         self.client = client
         self.site = site
+        # Registry ID of the site device, parent of all UniFi devices.
+        self.site_device_id = site_device_id
 
     async def _async_update_data(self) -> UnifiSiteData:
         """Fetch devices and clients in parallel."""

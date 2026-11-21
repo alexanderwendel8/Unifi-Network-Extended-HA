@@ -12,6 +12,7 @@ from homeassistant.exceptions import (
     ConfigEntryError,
     ConfigEntryNotReady,
 )
+from homeassistant.helpers import device_registry as dr
 
 from .api import (
     UnifiApiClient,
@@ -25,8 +26,10 @@ from .const import (
     CONF_STATISTICS_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_STATISTICS_INTERVAL,
+    DOMAIN,
 )
 from .coordinator import UnifiSiteCoordinator, UnifiStatisticsCoordinator
+from .entity import MANUFACTURER, SITE_MODEL
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -71,11 +74,22 @@ async def async_setup_entry(
         # Not retried: the site was deleted or the API key has no access to it.
         raise ConfigEntryError(f"Site {entry.title} no longer exists")
 
+    # Register the site device first, UniFi devices reference it as parent.
+    site_device = dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, site.id)},
+        name=site.name,
+        manufacturer=MANUFACTURER,
+        model=SITE_MODEL,
+        entry_type=dr.DeviceEntryType.SERVICE,
+    )
+
     site_coordinator = UnifiSiteCoordinator(
         hass,
         entry,
         client,
         site,
+        site_device.id,
         entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
     )
     await site_coordinator.async_config_entry_first_refresh()

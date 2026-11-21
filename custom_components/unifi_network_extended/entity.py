@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import inspect
+
 from homeassistant.helpers.device_registry import (
     CONNECTION_NETWORK_MAC,
     DeviceEntryType,
     DeviceInfo,
+    DeviceRegistry,
 )
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -15,6 +18,14 @@ from .const import DOMAIN
 from .coordinator import UnifiSiteCoordinator, UnifiStatisticsCoordinator
 
 MANUFACTURER = "Ubiquiti"
+SITE_MODEL = "UniFi Network site"
+
+# Home Assistant 2026.8+ links child devices by the parent's registry ID
+# (`via_device_id`); `via_device` (parent identifier) is deprecated there and
+# removed in 2027.8. Older versions only know `via_device`.
+SUPPORTS_VIA_DEVICE_ID = (
+    "via_device_id" in inspect.signature(DeviceRegistry.async_get_or_create).parameters
+)
 
 
 def site_device_info(site: UnifiSite) -> DeviceInfo:
@@ -23,13 +34,21 @@ def site_device_info(site: UnifiSite) -> DeviceInfo:
         identifiers={(DOMAIN, site.id)},
         name=site.name,
         manufacturer=MANUFACTURER,
-        model="UniFi Network site",
+        model=SITE_MODEL,
         entry_type=DeviceEntryType.SERVICE,
     )
 
 
-def unifi_device_info(site: UnifiSite, device: UnifiDevice) -> DeviceInfo:
-    """Return the device info of an adopted UniFi device."""
+def unifi_device_info(
+    coordinator: UnifiSiteCoordinator, device: UnifiDevice
+) -> DeviceInfo:
+    """Return the device info of an adopted UniFi device, below the site device."""
+    if SUPPORTS_VIA_DEVICE_ID:
+        via: dict[str, str | tuple[str, str]] = {
+            "via_device_id": coordinator.site_device_id
+        }
+    else:
+        via = {"via_device": (DOMAIN, coordinator.site.id)}
     return DeviceInfo(
         identifiers={(DOMAIN, device.id)},
         connections={(CONNECTION_NETWORK_MAC, device.mac_address.lower())},
@@ -37,7 +56,7 @@ def unifi_device_info(site: UnifiSite, device: UnifiDevice) -> DeviceInfo:
         manufacturer=MANUFACTURER,
         model=device.model,
         sw_version=device.firmware_version or None,
-        via_device=(DOMAIN, site.id),
+        **via,
     )
 
 
@@ -73,7 +92,7 @@ class UnifiDeviceEntity(CoordinatorEntity[UnifiSiteCoordinator]):
         self.device_id = device_id
         self._attr_unique_id = f"{device_id}_{description.key}"
         self._attr_device_info = unifi_device_info(
-            coordinator.site, coordinator.data.devices[device_id]
+            coordinator, coordinator.data.devices[device_id]
         )
 
     @property
@@ -105,7 +124,7 @@ class UnifiDeviceStatisticsEntity(CoordinatorEntity[UnifiStatisticsCoordinator])
         self.device_id = device_id
         self._attr_unique_id = f"{device_id}_{description.key}"
         self._attr_device_info = unifi_device_info(
-            site_coordinator.site, site_coordinator.data.devices[device_id]
+            site_coordinator, site_coordinator.data.devices[device_id]
         )
 
     @property

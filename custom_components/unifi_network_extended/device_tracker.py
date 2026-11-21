@@ -5,8 +5,8 @@ API lists connected clients only, so a client missing from the list is
 considered away.
 
 As usual for router based trackers, Home Assistant creates trackers disabled
-unless a device with the same MAC address is already known (e.g. from another
-integration); they can be enabled individually.
+(up to 2026.x only when no device with the same MAC address is known yet);
+they can be enabled individually.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from homeassistant.components.device_tracker import ScannerEntity, SourceType
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -89,6 +90,12 @@ class UnifiClientTracker(CoordinatorEntity[UnifiSiteCoordinator], ScannerEntity)
         self._mac = mac
         self._unique_id = f"{coordinator.site.id}_{mac}"
         self._attr_name = name
+        # Home Assistant 2026.11+ expects the tracked device described by its MAC
+        # address (linking it to a device another integration already knows).
+        # Older versions ignore this, ScannerEntity.device_info is final there.
+        self._attr_device_info = DeviceInfo(
+            connections={(CONNECTION_NETWORK_MAC, mac)}, name=name
+        )
 
     @property
     def unique_id(self) -> str:
