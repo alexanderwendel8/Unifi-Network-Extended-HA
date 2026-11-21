@@ -38,7 +38,7 @@ from .conftest import ACCESS_POINT, GATEWAY, GATEWAY_PORTS, SITE
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 async def _poll(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
@@ -71,7 +71,7 @@ async def _enable(
             _entity_id(hass, domain, port, key), disabled_by=None
         )
     await hass.config_entries.async_reload(entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 async def test_ports_only_requested_for_online_devices_with_ports(

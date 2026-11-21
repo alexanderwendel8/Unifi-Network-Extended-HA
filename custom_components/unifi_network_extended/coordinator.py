@@ -119,6 +119,8 @@ class _UnifiPerDeviceCoordinator[DataT](DataUpdateCoordinator[dict[str, DataT]])
         )
         self.site_coordinator = site_coordinator
         self._semaphore = asyncio.Semaphore(STATISTICS_PARALLEL_REQUESTS)
+        # Empty until the first refresh, which runs in the background after setup.
+        self.data = {}
 
     def _include_device(self, device: UnifiDevice) -> bool:
         """Return True if data should be fetched for this device."""

@@ -39,6 +39,7 @@ async def test_restart_button(
 ) -> None:
     """Pressing the button restarts the device and refreshes the data."""
     assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
     entity_id = _entity_id(hass, GATEWAY.id)
     assert entity_id == "button.gateway_restart"
     devices_calls = mock_api["devices"].await_count
@@ -55,6 +56,7 @@ async def test_restart_button_unavailable_when_offline(
 ) -> None:
     """Offline devices cannot be restarted."""
     assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     assert hass.states.get(_entity_id(hass, ACCESS_POINT.id)).state == (
         STATE_UNAVAILABLE
@@ -66,6 +68,7 @@ async def test_restart_button_error(
 ) -> None:
     """API errors are shown to the user."""
     assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
     mock_api["restart"].side_effect = UnifiCannotConnect
 
     with pytest.raises(HomeAssistantError) as exc_info:
@@ -79,6 +82,7 @@ async def test_restart_button_invalid_auth(
 ) -> None:
     """An invalid API key starts the reauth flow."""
     assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
     mock_api["restart"].side_effect = UnifiInvalidAuth
 
     with pytest.raises(HomeAssistantError) as exc_info:
