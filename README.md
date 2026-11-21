@@ -61,10 +61,11 @@ erhalten ihre Entitäten automatisch, ohne Neustart.
 **Clients** (Device-Tracker)
 - Für jeden kabelgebundenen oder WLAN-Client mit MAC-Adresse: *zu Hause*, solange
   er verbunden ist. VPN-Verbindungen werden nicht verfolgt.
-- Wie bei anderen Router-Integrationen legt Home Assistant Tracker nur dann
-  aktiviert an, wenn ein Gerät mit derselben MAC-Adresse bereits bekannt ist.
-  Alle anderen Tracker sind vorhanden, aber deaktiviert und lassen sich einzeln
-  einschalten.
+- Wie bei anderen Router-Integrationen legt Home Assistant die Tracker
+  deaktiviert an (bis Version 2026.x nur, wenn noch kein Gerät mit derselben
+  MAC-Adresse bekannt ist). Gewünschte Tracker lassen sich einzeln einschalten;
+  sie werden dann dem Gerät mit dieser MAC-Adresse zugeordnet, z. B. dem
+  Smartphone aus der Companion-App, sonst entsteht ein eigenes Gerät.
 
 ## Symbole
 

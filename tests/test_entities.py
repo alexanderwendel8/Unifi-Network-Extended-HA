@@ -14,6 +14,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -229,3 +230,48 @@ async def test_new_device_is_added(
     await hass.async_block_till_done(wait_background_tasks=True)
 
     assert _state(hass, "dev-ap_state") == "offline"
+
+
+async def test_device_info_uses_via_device_id_when_supported(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Newer Home Assistant versions get the parent's registry ID."""
+    from custom_components.unifi_network_extended import entity
+
+    await _setup(hass, config_entry)
+    coordinator = config_entry.runtime_data.site_coordinator
+    site_device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, SITE.id)})
+    assert coordinator.site_device_id == site_device.id
+
+    monkeypatch.setattr(entity, "SUPPORTS_VIA_DEVICE_ID", True)
+    info = entity.unifi_device_info(coordinator, GATEWAY)
+    assert info["via_device_id"] == site_device.id
+    assert "via_device" not in info
+
+    monkeypatch.setattr(entity, "SUPPORTS_VIA_DEVICE_ID", False)
+    info = entity.unifi_device_info(coordinator, GATEWAY)
+    assert info["via_device"] == (DOMAIN, SITE.id)
+    assert "via_device_id" not in info
+
+
+async def test_tracker_describes_client_device(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
+    """Trackers carry the client's MAC address as device connection."""
+    from custom_components.unifi_network_extended.device_tracker import (
+        UnifiClientTracker,
+    )
+
+    await _setup(hass, config_entry)
+    tracker = UnifiClientTracker(
+        config_entry.runtime_data.site_coordinator,
+        PHONE.mac_address.lower(),
+        PHONE.name,
+    )
+    assert tracker._attr_device_info["connections"] == {
+        (dr.CONNECTION_NETWORK_MAC, PHONE.mac_address.lower())
+    }
+    assert tracker._attr_device_info["name"] == "Phone"
