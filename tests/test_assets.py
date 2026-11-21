@@ -17,6 +17,8 @@ from custom_components.unifi_network_extended.sensor import (
     DEVICE_STATES,
     PORT_POE_STATES,
     PORT_SENSORS,
+    RADIO_SENSORS,
+    RADIO_TX_RETRIES_SENSOR,
     SITE_SENSORS,
     STATISTICS_SENSORS,
     UPTIME_SENSOR,
@@ -37,6 +39,8 @@ def test_every_sensor_has_an_icon_and_a_name() -> None:
             *STATISTICS_SENSORS,
             *PORT_SENSORS,
             *DETAILS_SENSORS,
+            *RADIO_SENSORS,
+            RADIO_TX_RETRIES_SENSOR,
             DEVICE_CLIENTS_SENSOR,
             UPTIME_SENSOR,
         )
@@ -87,3 +91,11 @@ def test_poe_state_icons_cover_all_states() -> None:
     assert set(icons["entity"]["sensor"]["port_poe_state"]["state"]) == set(
         PORT_POE_STATES
     )
+
+
+def test_radio_sensor_names_contain_band() -> None:
+    """Radio sensor names include the band, e.g. "5 GHz channel"."""
+    for language in ("strings.json", "translations/de.json"):
+        strings = json.loads((COMPONENT / language).read_text())["entity"]["sensor"]
+        for description in (*RADIO_SENSORS, RADIO_TX_RETRIES_SENSOR):
+            assert "{band}" in strings[description.translation_key]["name"]

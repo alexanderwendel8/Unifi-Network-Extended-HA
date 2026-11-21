@@ -186,6 +186,18 @@
       },
       "last_provisioned": {
         "name": "Zuletzt provisioniert"
+      },
+      "radio_channel": {
+        "name": "{band} GHz Kanal"
+      },
+      "radio_channel_width": {
+        "name": "{band} GHz Kanalbreite"
+      },
+      "radio_wlan_standard": {
+        "name": "{band} GHz WLAN-Standard"
+      },
+      "radio_tx_retries": {
+        "name": "{band} GHz TX-Wiederholungen"
       }
     },
     "button": {

@@ -23,6 +23,7 @@ from .api import (
     UnifiDeviceDetails,
     UnifiDeviceStatistics,
     UnifiPort,
+    UnifiRadio,
     UnifiSite,
 )
 from .const import DOMAIN
@@ -270,3 +271,90 @@ def async_setup_port_entities[EntityT: Entity](
 
     _async_add_new_ports()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_ports))
+
+
+class _UnifiRadioEntity[
+    CoordinatorT: (
+        UnifiDeviceDetailsCoordinator,
+        UnifiStatisticsCoordinator,
+    )
+](CoordinatorEntity[CoordinatorT]):
+    """Entity of one radio band of an access point, e.g. "5 GHz channel"."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: CoordinatorT,
+        description: EntityDescription,
+        device_id: str,
+        band: str,
+    ) -> None:
+        """Initialize the entity."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self.device_id = device_id
+        self.band = band
+        band_key = band.replace(".", "_")
+        self._attr_unique_id = f"{device_id}_radio_{band_key}_{description.key}"
+        self._attr_translation_placeholders = {"band": band}
+        site_coordinator = coordinator.site_coordinator
+        self._attr_device_info = unifi_device_info(
+            site_coordinator, site_coordinator.data.devices[device_id]
+        )
+
+
+class UnifiRadioEntity(_UnifiRadioEntity[UnifiDeviceDetailsCoordinator]):
+    """Entity based on a radio of the device details (channel, width, standard)."""
+
+    @property
+    def radio(self) -> UnifiRadio | None:
+        """Return the radio, None if unknown (e.g. access point offline)."""
+        if (details := self.coordinator.data.get(self.device_id)) is None:
+            return None
+        return details.radios.get(self.band)
+
+    @property
+    def available(self) -> bool:
+        """Radio data is only available while the access point is online."""
+        return super().available and self.radio is not None
+
+
+class UnifiRadioStatisticsEntity(_UnifiRadioEntity[UnifiStatisticsCoordinator]):
+    """Entity based on the latest statistics of a radio (TX retries)."""
+
+    @property
+    def available(self) -> bool:
+        """Statistics are only available while the access point is online."""
+        statistics = self.coordinator.data.get(self.device_id)
+        return (
+            super().available
+            and statistics is not None
+            and self.band in statistics.radio_tx_retries_pct
+        )
+
+
+def async_setup_radio_entities[DataT](
+    entry: ConfigEntry,
+    coordinator: UnifiDeviceDetailsCoordinator | UnifiStatisticsCoordinator,
+    bands_fn: Callable[[DataT], Iterable[str]],
+    entity_factory: Callable[[str, str], Iterable[Entity]],
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Add radio entities now and for radios (or access points) that appear later."""
+    known: set[tuple[str, str]] = set()
+
+    @callback
+    def _async_add_new_radios() -> None:
+        entities: list[Entity] = []
+        for device_id, data in coordinator.data.items():
+            for band in bands_fn(data):
+                if (device_id, band) in known:
+                    continue
+                known.add((device_id, band))
+                entities.extend(entity_factory(device_id, band))
+        if entities:
+            async_add_entities(entities)
+
+    _async_add_new_radios()
+    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_radios))

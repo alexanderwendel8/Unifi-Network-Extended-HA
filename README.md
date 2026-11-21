@@ -57,6 +57,11 @@ Home Assistant automatisch einen neuen an.
 - Firmware-Version und Systemlast (standardmäßig deaktiviert)
 - Knopf *Neu starten* (nur verfügbar, solange das Gerät online ist)
 
+**Pro Funkband** (Access Points, je 2,4 / 5 / 6 GHz)
+- Kanal, Kanalbreite und WLAN-Standard (Diagnose)
+- TX-Wiederholungen in % (Anteil erneut gesendeter Pakete, ein Hinweis auf
+  Störungen oder Überlast)
+
 **Pro Port** (Switches, Gateways mit Switch-Ports)
 - Verbindung (verbunden/getrennt) und aktuelle Geschwindigkeit
 - Maximale Geschwindigkeit und Anschlusstyp (RJ45, SFP, SFP+ …) (standardmäßig deaktiviert)

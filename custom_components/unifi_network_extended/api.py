@@ -7,7 +7,7 @@ Only endpoints from the official OpenAPI specification in
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 import logging
 from typing import Any
@@ -127,6 +127,31 @@ class UnifiPort:
         )
 
 
+def radio_band(frequency_ghz: float) -> str:
+    """Return the band key of a radio frequency, e.g. 2.4 -> "2.4", 5.0 -> "5"."""
+    return f"{frequency_ghz:g}"
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiRadio:
+    """A wireless radio of an access point ("Wireless radio overview")."""
+
+    frequency_ghz: float  # 2.4, 5, 6 or 60
+    wlan_standard: str  # 802.11a/b/g/n/ac/ax/be
+    channel_width_mhz: int
+    channel: int | None
+
+    @classmethod
+    def from_api(cls, data: Mapping[str, Any]) -> UnifiRadio:
+        """Create from a "Wireless radio overview" object."""
+        return cls(
+            frequency_ghz=data["frequencyGHz"],
+            wlan_standard=data["wlanStandard"],
+            channel_width_mhz=data["channelWidthMHz"],
+            channel=data.get("channel"),
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class UnifiDeviceDetails:
     """Details of an adopted device ("Adopted device details")."""
@@ -135,12 +160,20 @@ class UnifiDeviceDetails:
     uplink_device_id: str | None
     provisioned_at: datetime | None
     adopted_at: datetime | None
+    # Wireless radios keyed by band (see radio_band), access points only.
+    radios: dict[str, UnifiRadio] = field(default_factory=dict)
 
     @classmethod
     def from_api(cls, data: Mapping[str, Any]) -> UnifiDeviceDetails:
         """Create from an "Adopted device details" object."""
-        ports = (data.get("interfaces") or {}).get("ports") or []
+        interfaces = data.get("interfaces") or {}
+        ports = interfaces.get("ports") or []
+        radios = interfaces.get("radios") or []
         return cls(
+            radios={
+                radio_band(radio["frequencyGHz"]): UnifiRadio.from_api(radio)
+                for radio in radios
+            },
             ports={port["idx"]: UnifiPort.from_api(port) for port in ports},
             uplink_device_id=(data.get("uplink") or {}).get("deviceId"),
             provisioned_at=_parse_datetime(data.get("provisionedAt")),
@@ -192,11 +225,14 @@ class UnifiDeviceStatistics:
     load_average_15min: float | None
     uplink_rx_rate_bps: int | None
     uplink_tx_rate_bps: int | None
+    # TX retries in percent per radio band (see radio_band), access points only.
+    radio_tx_retries_pct: dict[str, float | None] = field(default_factory=dict)
 
     @classmethod
     def from_api(cls, data: Mapping[str, Any]) -> UnifiDeviceStatistics:
         """Create from a "Latest statistics for a device" object."""
         uplink = data.get("uplink") or {}
+        radios = (data.get("interfaces") or {}).get("radios") or []
         return cls(
             uptime_sec=data.get("uptimeSec"),
             cpu_utilization_pct=data.get("cpuUtilizationPct"),
@@ -206,6 +242,10 @@ class UnifiDeviceStatistics:
             load_average_15min=data.get("loadAverage15Min"),
             uplink_rx_rate_bps=uplink.get("rxRateBps"),
             uplink_tx_rate_bps=uplink.get("txRateBps"),
+            radio_tx_retries_pct={
+                radio_band(radio["frequencyGHz"]): radio.get("txRetriesPct")
+                for radio in radios
+            },
         )
 
 
@@ -287,7 +327,7 @@ class UnifiApiClient:
     async def async_get_device_details(
         self, site_id: str, device_id: str
     ) -> UnifiDeviceDetails:
-        """Return the details of an adopted device (ports, uplink, provisioning).
+        """Return the details of an adopted device (ports, radios, uplink, ...).
 
         ``GET /v1/sites/{siteId}/devices/{deviceId}`` ("Adopted device details").
         """

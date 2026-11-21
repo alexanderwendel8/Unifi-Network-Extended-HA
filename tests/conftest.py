@@ -16,6 +16,7 @@ from custom_components.unifi_network_extended.api import (
     UnifiDeviceStatistics,
     UnifiPort,
     UnifiPortPoe,
+    UnifiRadio,
     UnifiSite,
 )
 from custom_components.unifi_network_extended.const import CONF_SITE_ID, DOMAIN
@@ -128,7 +129,30 @@ ACCESS_POINT_DETAILS = UnifiDeviceDetails(
     uplink_device_id=GATEWAY.id,
     provisioned_at=None,
     adopted_at=None,
+    radios={
+        "2.4": UnifiRadio(
+            frequency_ghz=2.4, wlan_standard="802.11ax", channel_width_mhz=20, channel=6
+        ),
+        "5": UnifiRadio(
+            frequency_ghz=5, wlan_standard="802.11be", channel_width_mhz=160, channel=36
+        ),
+    },
 )
+ACCESS_POINT_STATS = UnifiDeviceStatistics(
+    uptime_sec=7200,
+    cpu_utilization_pct=5.0,
+    memory_utilization_pct=30.0,
+    load_average_1min=None,
+    load_average_5min=None,
+    load_average_15min=None,
+    uplink_rx_rate_bps=1_000,
+    uplink_tx_rate_bps=2_000,
+    radio_tx_retries_pct={"2.4": 12.5, "5": 3.2},
+)
+
+
+async def _device_statistics(site_id: str, device_id: str) -> UnifiDeviceStatistics:
+    return GATEWAY_STATS if device_id == GATEWAY.id else ACCESS_POINT_STATS
 
 
 async def _device_details(site_id: str, device_id: str) -> UnifiDeviceDetails:
@@ -175,7 +199,7 @@ def mock_api() -> Generator[dict[str, AsyncMock]]:
             f"{API}.async_get_clients", return_value=[PHONE, NAS, VPN_USER]
         ) as clients,
         patch(
-            f"{API}.async_get_device_statistics", return_value=GATEWAY_STATS
+            f"{API}.async_get_device_statistics", side_effect=_device_statistics
         ) as statistics,
         patch(f"{API}.async_restart_device", return_value=None) as restart,
         patch(

@@ -253,3 +253,51 @@ async def test_power_cycle_port(
         "/proxy/network/integration/v1/sites/s1/devices/d1/interfaces/ports/4/actions"
     )
     assert body == {"action": "POWER_CYCLE"}
+
+
+async def test_radios_in_details_and_statistics(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Radios are read from the device details and the latest statistics."""
+    aioclient_mock.get(
+        f"{BASE}/v1/sites/s1/devices/ap",
+        json={
+            "id": "ap",
+            "interfaces": {
+                "radios": [
+                    {
+                        "frequencyGHz": 2.4,
+                        "wlanStandard": "802.11ax",
+                        "channelWidthMHz": 20,
+                        "channel": 6,
+                    },
+                    {
+                        "frequencyGHz": 6,
+                        "wlanStandard": "802.11be",
+                        "channelWidthMHz": 320,
+                    },
+                ]
+            },
+        },
+    )
+    aioclient_mock.get(
+        f"{BASE}/v1/sites/s1/devices/ap/statistics/latest",
+        json={
+            "interfaces": {
+                "radios": [
+                    {"frequencyGHz": 2.4, "txRetriesPct": 12.5},
+                    {"frequencyGHz": 6},
+                ]
+            }
+        },
+    )
+    client = _client(hass)
+
+    details = await client.async_get_device_details("s1", "ap")
+    assert set(details.radios) == {"2.4", "6"}
+    assert details.radios["2.4"].channel == 6
+    assert details.radios["6"].channel is None
+    assert details.radios["6"].channel_width_mhz == 320
+
+    stats = await client.async_get_device_statistics("s1", "ap")
+    assert stats.radio_tx_retries_pct == {"2.4": 12.5, "6": None}

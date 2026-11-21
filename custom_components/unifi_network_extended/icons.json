@@ -96,6 +96,18 @@
       },
       "last_provisioned": {
         "default": "mdi:cog-sync"
+      },
+      "radio_channel": {
+        "default": "mdi:access-point"
+      },
+      "radio_channel_width": {
+        "default": "mdi:arrow-expand-horizontal"
+      },
+      "radio_wlan_standard": {
+        "default": "mdi:wifi-cog"
+      },
+      "radio_tx_retries": {
+        "default": "mdi:wifi-refresh"
       }
     },
     "binary_sensor": {
