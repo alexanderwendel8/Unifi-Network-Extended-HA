@@ -85,7 +85,7 @@ async def async_setup_entry(
 
     async_setup_port_entities(
         entry,
-        entry.runtime_data.ports_coordinator,
+        entry.runtime_data.details_coordinator,
         PORT_BINARY_SENSORS,
         UnifiPortBinarySensor,
         async_add_entities,

@@ -24,6 +24,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.unifi_network_extended.api import (
     UnifiCannotConnect,
+    UnifiDeviceDetails,
     UnifiInvalidAuth,
     UnifiPort,
 )
@@ -33,7 +34,13 @@ from custom_components.unifi_network_extended.const import (
     DOMAIN,
 )
 
-from .conftest import ACCESS_POINT, GATEWAY, GATEWAY_PORTS, SITE
+from .conftest import (
+    ACCESS_POINT,
+    ACCESS_POINT_DETAILS,
+    GATEWAY,
+    GATEWAY_DETAILS,
+    SITE,
+)
 
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
@@ -74,12 +81,12 @@ async def _enable(
     await hass.async_block_till_done(wait_background_tasks=True)
 
 
-async def test_ports_only_requested_for_online_devices_with_ports(
+async def test_details_only_requested_for_online_devices(
     hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
 ) -> None:
-    """The access point has no ports interface (and is offline)."""
+    """The access point is offline, so only the gateway details are fetched."""
     await _setup(hass, config_entry)
-    mock_api["ports"].assert_awaited_once_with(SITE.id, GATEWAY.id)
+    mock_api["details"].assert_awaited_once_with(SITE.id, GATEWAY.id)
 
 
 async def test_port_link_and_speed(
@@ -155,7 +162,7 @@ async def test_power_cycle_button(
     await _setup(hass, config_entry)
     entity_id = _entity_id(hass, "button", 1, "poe_power_cycle")
     assert entity_id == "button.gateway_port_1_poe_power_cycle"
-    calls = mock_api["ports"].await_count
+    calls = mock_api["details"].await_count
 
     await hass.services.async_call(
         BUTTON_DOMAIN, SERVICE_PRESS, {ATTR_ENTITY_ID: entity_id}, blocking=True
@@ -163,7 +170,7 @@ async def test_power_cycle_button(
     await hass.async_block_till_done(wait_background_tasks=True)
 
     mock_api["power_cycle"].assert_awaited_once_with(SITE.id, GATEWAY.id, 1)
-    assert mock_api["ports"].await_count > calls
+    assert mock_api["details"].await_count > calls
 
 
 async def test_power_cycle_button_unavailable_without_poe(
@@ -251,9 +258,12 @@ async def test_new_device_ports_are_added(
         )
     }
     mock_api["devices"].return_value = [GATEWAY, switch]
-    mock_api["ports"].side_effect = lambda site_id, device_id: (
-        switch_ports if device_id == "dev-sw" else GATEWAY_PORTS
-    )
+    switch_details = replace(ACCESS_POINT_DETAILS, ports=switch_ports)
+
+    async def details(site_id: str, device_id: str) -> UnifiDeviceDetails:
+        return switch_details if device_id == "dev-sw" else GATEWAY_DETAILS
+
+    mock_api["details"].side_effect = details
     await _poll(hass, freezer)
 
     assert hass.states.get("binary_sensor.switch_port_5_link").state == STATE_ON

@@ -73,7 +73,7 @@ async def async_setup_entry(
 
     async_setup_port_entities(
         entry,
-        entry.runtime_data.ports_coordinator,
+        entry.runtime_data.details_coordinator,
         (POE_POWER_CYCLE,),
         UnifiPoePowerCycleButton,
         async_add_entities,

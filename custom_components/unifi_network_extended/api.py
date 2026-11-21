@@ -25,6 +25,11 @@ REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=15)
 PAGE_LIMIT = 200  # Maximum page size allowed by the API.
 
 
+def _parse_datetime(value: str | None) -> datetime | None:
+    """Parse an ISO 8601 timestamp of the API, None if missing."""
+    return dt_util.parse_datetime(value) if value else None
+
+
 class UnifiApiError(Exception):
     """Base error for the UniFi API client."""
 
@@ -123,6 +128,27 @@ class UnifiPort:
 
 
 @dataclass(frozen=True, slots=True)
+class UnifiDeviceDetails:
+    """Details of an adopted device ("Adopted device details")."""
+
+    ports: dict[int, UnifiPort]
+    uplink_device_id: str | None
+    provisioned_at: datetime | None
+    adopted_at: datetime | None
+
+    @classmethod
+    def from_api(cls, data: Mapping[str, Any]) -> UnifiDeviceDetails:
+        """Create from an "Adopted device details" object."""
+        ports = (data.get("interfaces") or {}).get("ports") or []
+        return cls(
+            ports={port["idx"]: UnifiPort.from_api(port) for port in ports},
+            uplink_device_id=(data.get("uplink") or {}).get("deviceId"),
+            provisioned_at=_parse_datetime(data.get("provisionedAt")),
+            adopted_at=_parse_datetime(data.get("adoptedAt")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class UnifiClient:
     """A connected client (``GET /v1/sites/{siteId}/clients``)."""
 
@@ -145,7 +171,7 @@ class UnifiClient:
             type=data["type"],
             mac_address=data.get("macAddress"),
             ip_address=data.get("ipAddress"),
-            connected_at=dt_util.parse_datetime(connected_at) if connected_at else None,
+            connected_at=_parse_datetime(connected_at),
             uplink_device_id=data.get("uplinkDeviceId"),
             access_type=(data.get("access") or {}).get("type"),
         )
@@ -258,17 +284,16 @@ class UnifiApiClient:
             expect_body=False,
         )
 
-    async def async_get_device_ports(
+    async def async_get_device_details(
         self, site_id: str, device_id: str
-    ) -> dict[int, UnifiPort]:
-        """Return the physical ports of a device, keyed by port index.
+    ) -> UnifiDeviceDetails:
+        """Return the details of an adopted device (ports, uplink, provisioning).
 
-        ``GET /v1/sites/{siteId}/devices/{deviceId}`` ("Adopted device details",
-        ``interfaces.ports``).
+        ``GET /v1/sites/{siteId}/devices/{deviceId}`` ("Adopted device details").
         """
-        data = await self._request("GET", f"/v1/sites/{site_id}/devices/{device_id}")
-        ports = (data.get("interfaces") or {}).get("ports") or []
-        return {port["idx"]: UnifiPort.from_api(port) for port in ports}
+        return UnifiDeviceDetails.from_api(
+            await self._request("GET", f"/v1/sites/{site_id}/devices/{device_id}")
+        )
 
     async def async_power_cycle_port(
         self, site_id: str, device_id: str, port_idx: int

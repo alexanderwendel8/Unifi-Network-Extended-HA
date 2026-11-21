@@ -52,6 +52,8 @@ Home Assistant automatisch einen neuen an.
 - Firmware-Update verfügbar (Binärsensor)
 - CPU- und Speicherauslastung, Uplink Download- und Upload-Rate
 - Letzter Neustart, IP-Adresse
+- Verbundene Clients (direkt an diesem Switch bzw. Access Point)
+- Uplink-Gerät (an welchem Gerät es hängt) und Zeitpunkt der letzten Provisionierung (Diagnose)
 - Firmware-Version und Systemlast (standardmäßig deaktiviert)
 - Knopf *Neu starten* (nur verfügbar, solange das Gerät online ist)
 
@@ -97,7 +99,7 @@ regelmäßig ab. Unter *⋮ → Optionen* einstellbar:
 | Option | Standard | Hinweis |
 |---|---|---|
 | Abrufintervall Geräte und Clients | 30 s | min. 10 s |
-| Abrufintervall Gerätestatistik und Ports | 60 s | min. 30 s; eine Anfrage pro Gerät bzw. Switch |
+| Abrufintervall Gerätestatistik und Gerätedetails | 60 s | min. 30 s; je zwei Anfragen pro Gerät (Statistik, Details mit Ports und Uplink) |
 | Clients verfolgen | an | beim Ausschalten werden die Tracker entfernt |
 
 ## Speicherung des API-Schlüssels

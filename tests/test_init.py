@@ -44,7 +44,7 @@ async def test_setup_and_unload(
         ("clients", {"side_effect": UnifiInvalidAuth}, ConfigEntryState.SETUP_ERROR),
         # Statistics and ports load in the background and do not block the setup.
         ("statistics", {"side_effect": UnifiCannotConnect}, ConfigEntryState.LOADED),
-        ("ports", {"side_effect": UnifiCannotConnect}, ConfigEntryState.LOADED),
+        ("details", {"side_effect": UnifiCannotConnect}, ConfigEntryState.LOADED),
     ],
 )
 async def test_setup_failures(
@@ -106,8 +106,8 @@ async def test_setup_does_not_wait_for_device_data(
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     assert config_entry.state is ConfigEntryState.LOADED
     await started.wait()
-    # Ports were fetched while the statistics were still pending.
-    mock_api["ports"].assert_awaited_once()
+    # Details were fetched while the statistics were still pending.
+    mock_api["details"].assert_awaited_once()
     assert config_entry.runtime_data.statistics_coordinator.data == {}
     assert hass.states.get("sensor.gateway_cpu_utilization").state == "unavailable"
 
