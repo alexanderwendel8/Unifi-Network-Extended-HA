@@ -18,9 +18,16 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import UnifiNetworkExtendedConfigEntry
-from .api import UnifiDevice, UnifiDeviceStatistics
+from .api import UnifiDevice, UnifiDeviceStatistics, UnifiPort
 from .coordinator import UnifiSiteData
-from .entity import UnifiDeviceEntity, UnifiDeviceStatisticsEntity, UnifiSiteEntity
+from .entity import (
+    UnifiDeviceEntity,
+    UnifiDeviceStatisticsEntity,
+    UnifiPortEntity,
+    UnifiPortEntityDescription,
+    UnifiSiteEntity,
+    async_setup_port_entities,
+)
 
 PARALLEL_UPDATES = 0  # Coordinator based, no per-entity polling.
 
@@ -199,6 +206,84 @@ STATISTICS_SENSORS: tuple[UnifiStatisticsSensorDescription, ...] = (
     ),
 )
 
+# Enum values from the "Port overview" / "Port PoE overview" schemas.
+PORT_CONNECTORS = ["rj45", "sfp", "sfpplus", "sfp28", "qsfp28"]
+PORT_POE_STATES = ["up", "down", "limited", "unknown"]
+
+
+def _enum(value: str, options: list[str]) -> str | None:
+    return value if (value := value.lower()) in options else None
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnifiPortSensorDescription(UnifiPortEntityDescription, SensorEntityDescription):
+    """Describes a sensor of a device port."""
+
+    value_fn: Callable[[UnifiPort], str | int | None]
+
+
+def _has_poe(port: UnifiPort) -> bool:
+    return port.poe is not None
+
+
+PORT_SENSORS: tuple[UnifiPortSensorDescription, ...] = (
+    UnifiPortSensorDescription(
+        key="link_speed",
+        translation_key="port_link_speed",
+        device_class=SensorDeviceClass.DATA_RATE,
+        native_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+        state_class=SensorStateClass.MEASUREMENT,
+        # Only reported while the link is up.
+        value_fn=lambda port: port.speed_mbps if port.state == "UP" else 0,
+    ),
+    UnifiPortSensorDescription(
+        key="max_speed",
+        translation_key="port_max_speed",
+        device_class=SensorDeviceClass.DATA_RATE,
+        native_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda port: port.max_speed_mbps,
+    ),
+    UnifiPortSensorDescription(
+        key="connector",
+        translation_key="port_connector",
+        device_class=SensorDeviceClass.ENUM,
+        options=PORT_CONNECTORS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda port: _enum(port.connector, PORT_CONNECTORS),
+    ),
+    UnifiPortSensorDescription(
+        key="poe_state",
+        translation_key="port_poe_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=PORT_POE_STATES,
+        exists_fn=_has_poe,
+        # Only enabled by default where PoE is switched on.
+        enabled_fn=lambda port: port.poe is not None and port.poe.enabled,
+        value_fn=lambda port: (
+            _enum(port.poe.state, PORT_POE_STATES) if port.poe else None
+        ),
+    ),
+    UnifiPortSensorDescription(
+        key="poe_standard",
+        translation_key="port_poe_standard",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        exists_fn=_has_poe,
+        value_fn=lambda port: port.poe.standard if port.poe else None,
+    ),
+    UnifiPortSensorDescription(
+        key="poe_type",
+        translation_key="port_poe_type",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        exists_fn=_has_poe,
+        value_fn=lambda port: port.poe.type if port.poe else None,
+    ),
+)
+
 UPTIME_SENSOR = SensorEntityDescription(
     key="uptime",
     translation_key="uptime",
@@ -249,6 +334,14 @@ async def async_setup_entry(
 
     _async_add_new_devices()
     entry.async_on_unload(site_coordinator.async_add_listener(_async_add_new_devices))
+
+    async_setup_port_entities(
+        entry,
+        entry.runtime_data.ports_coordinator,
+        PORT_SENSORS,
+        UnifiPortSensor,
+        async_add_entities,
+    )
 
 
 class UnifiSiteSensor(UnifiSiteEntity, SensorEntity):
@@ -311,3 +404,16 @@ class UnifiUptimeSensor(UnifiDeviceStatisticsEntity, SensorEntity):
         ):
             self._last_boot = boot
         return self._last_boot
+
+
+class UnifiPortSensor(UnifiPortEntity, SensorEntity):
+    """Sensor of a device port."""
+
+    entity_description: UnifiPortSensorDescription
+
+    @property
+    def native_value(self) -> str | int | None:
+        """Return the sensor value."""
+        if (port := self.port) is None:
+            return None
+        return self.entity_description.value_fn(port)

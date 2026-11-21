@@ -63,6 +63,49 @@
       },
       "uptime": {
         "default": "mdi:restart"
+      },
+      "port_link_speed": {
+        "default": "mdi:speedometer"
+      },
+      "port_max_speed": {
+        "default": "mdi:speedometer"
+      },
+      "port_connector": {
+        "default": "mdi:ethernet-cable"
+      },
+      "port_poe_state": {
+        "default": "mdi:flash-alert",
+        "state": {
+          "up": "mdi:flash",
+          "down": "mdi:flash-off",
+          "limited": "mdi:flash-alert",
+          "unknown": "mdi:flash-outline"
+        }
+      },
+      "port_poe_standard": {
+        "default": "mdi:flash-outline"
+      },
+      "port_poe_type": {
+        "default": "mdi:flash-outline"
+      }
+    },
+    "binary_sensor": {
+      "port_link": {
+        "default": "mdi:ethernet",
+        "state": {
+          "off": "mdi:ethernet-off"
+        }
+      },
+      "port_poe_enabled": {
+        "default": "mdi:flash",
+        "state": {
+          "off": "mdi:flash-off"
+        }
+      }
+    },
+    "button": {
+      "port_poe_power_cycle": {
+        "default": "mdi:power-cycle"
       }
     }
   }

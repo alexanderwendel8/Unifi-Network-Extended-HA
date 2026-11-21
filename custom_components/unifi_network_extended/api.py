@@ -59,6 +59,7 @@ class UnifiDevice:
     firmware_version: str
     firmware_updatable: bool
     features: frozenset[str]
+    interfaces: frozenset[str] = frozenset()  # "ports" and/or "radios"
 
     @classmethod
     def from_api(cls, data: Mapping[str, Any]) -> UnifiDevice:
@@ -73,6 +74,51 @@ class UnifiDevice:
             firmware_version=data.get("firmwareVersion", ""),
             firmware_updatable=data["firmwareUpdatable"],
             features=frozenset(data.get("features", ())),
+            interfaces=frozenset(data.get("interfaces", ())),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiPortPoe:
+    """PoE details of a port ("Port PoE overview")."""
+
+    enabled: bool
+    state: str  # UP, DOWN, LIMITED or UNKNOWN
+    standard: str  # 802.3af, 802.3at or 802.3bt
+    type: int  # 1-4
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiPort:
+    """A physical port of a device ("Port overview")."""
+
+    idx: int
+    state: str  # UP, DOWN or UNKNOWN
+    connector: str  # RJ45, SFP, SFPPLUS, SFP28 or QSFP28
+    max_speed_mbps: int
+    speed_mbps: int | None
+    poe: UnifiPortPoe | None
+
+    @classmethod
+    def from_api(cls, data: Mapping[str, Any]) -> UnifiPort:
+        """Create from a "Port overview" object."""
+        poe = data.get("poe")
+        return cls(
+            idx=data["idx"],
+            state=data["state"],
+            connector=data["connector"],
+            max_speed_mbps=data["maxSpeedMbps"],
+            speed_mbps=data.get("speedMbps"),
+            poe=(
+                UnifiPortPoe(
+                    enabled=poe["enabled"],
+                    state=poe["state"],
+                    standard=poe["standard"],
+                    type=int(poe["type"]),
+                )
+                if poe
+                else None
+            ),
         )
 
 
@@ -209,6 +255,35 @@ class UnifiApiClient:
             "POST",
             f"/v1/sites/{site_id}/devices/{device_id}/actions",
             json={"action": "RESTART"},
+            expect_body=False,
+        )
+
+    async def async_get_device_ports(
+        self, site_id: str, device_id: str
+    ) -> dict[int, UnifiPort]:
+        """Return the physical ports of a device, keyed by port index.
+
+        ``GET /v1/sites/{siteId}/devices/{deviceId}`` ("Adopted device details",
+        ``interfaces.ports``).
+        """
+        data = await self._request("GET", f"/v1/sites/{site_id}/devices/{device_id}")
+        ports = (data.get("interfaces") or {}).get("ports") or []
+        return {port["idx"]: UnifiPort.from_api(port) for port in ports}
+
+    async def async_power_cycle_port(
+        self, site_id: str, device_id: str, port_idx: int
+    ) -> None:
+        """Power-cycle PoE on a port.
+
+        ``POST /v1/sites/{siteId}/devices/{deviceId}``
+        ``/interfaces/ports/{portIdx}/actions`` with the
+        "Port PoE power-cycle request" body ``{"action": "POWER_CYCLE"}``.
+        """
+        await self._request(
+            "POST",
+            f"/v1/sites/{site_id}/devices/{device_id}/interfaces/ports/{port_idx}"
+            "/actions",
+            json={"action": "POWER_CYCLE"},
             expect_body=False,
         )
 

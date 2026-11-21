@@ -55,7 +55,18 @@ Home Assistant automatisch einen neuen an.
 - Firmware-Version und Systemlast (standardmäßig deaktiviert)
 - Knopf *Neu starten* (nur verfügbar, solange das Gerät online ist)
 
-Statistikwerte gibt es nur für Geräte, die online sind. Neu adoptierte Geräte
+**Pro Port** (Switches, Gateways mit Switch-Ports)
+- Verbindung (verbunden/getrennt) und aktuelle Geschwindigkeit
+- Maximale Geschwindigkeit und Anschlusstyp (RJ45, SFP, SFP+ …) (standardmäßig deaktiviert)
+- Nur PoE-Ports: PoE-Status (Liefert Strom, Aus, Begrenzt) und Knopf
+  *PoE neu starten* (Power-Cycle, z. B. für hängende Kameras oder Access Points);
+  beide nur aktiviert, wo PoE eingeschaltet ist. PoE aktiviert, PoE-Standard und
+  PoE-Typ als Diagnose (standardmäßig deaktiviert)
+
+PoE lässt sich über die offizielle API nicht dauerhaft ein- oder ausschalten, und
+die Leistungsaufnahme wird nicht geliefert.
+
+Statistik- und Portwerte gibt es nur für Geräte, die online sind. Neu adoptierte Geräte
 erhalten ihre Entitäten automatisch, ohne Neustart.
 
 **Clients** (Device-Tracker)
@@ -83,7 +94,7 @@ regelmäßig ab. Unter *⋮ → Optionen* einstellbar:
 | Option | Standard | Hinweis |
 |---|---|---|
 | Abrufintervall Geräte und Clients | 30 s | min. 10 s |
-| Abrufintervall Gerätestatistik | 60 s | min. 30 s; eine Anfrage pro Gerät |
+| Abrufintervall Gerätestatistik und Ports | 60 s | min. 30 s; eine Anfrage pro Gerät bzw. Switch |
 | Clients verfolgen | an | beim Ausschalten werden die Tracker entfernt |
 
 ## Speicherung des API-Schlüssels
