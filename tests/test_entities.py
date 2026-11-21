@@ -306,3 +306,47 @@ async def test_device_clients_uplink_and_provisioning(
 
     assert _state(hass, f"{ACCESS_POINT.id}_uplink_device") == "Gateway"
     assert hass.states.get("sensor.access_point_uplink_device").state == "Gateway"
+
+
+async def test_radio_sensors(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Each radio band of an access point gets its own sensors."""
+    mock_api["devices"].return_value = [GATEWAY, replace(ACCESS_POINT, state="ONLINE")]
+    await _setup(hass, config_entry)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert hass.states.get("sensor.access_point_2_4_ghz_channel").state == "6"
+    assert hass.states.get("sensor.access_point_5_ghz_channel").state == "36"
+    assert hass.states.get("sensor.access_point_5_ghz_channel_width").state == "160"
+    assert (
+        hass.states.get("sensor.access_point_5_ghz_wi_fi_standard").state == "802.11be"
+    )
+    assert hass.states.get("sensor.access_point_2_4_ghz_tx_retries").state == "12.5"
+    assert hass.states.get("sensor.access_point_5_ghz_tx_retries").state == "3.2"
+    assert _state(hass, f"{ACCESS_POINT.id}_radio_2_4_channel") == "6"
+    # The gateway has no radios.
+    registry = er.async_get(hass)
+    assert not [
+        e
+        for e in er.async_entries_for_config_entry(registry, config_entry.entry_id)
+        if e.unique_id.startswith(f"{GATEWAY.id}_radio")
+    ]
+
+    # The access point goes offline: radio data becomes unavailable.
+    mock_api["devices"].return_value = [GATEWAY, ACCESS_POINT]
+    for seconds in (DEFAULT_SCAN_INTERVAL, DEFAULT_STATISTICS_INTERVAL):
+        freezer.tick(timedelta(seconds=seconds))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert (
+        hass.states.get("sensor.access_point_5_ghz_channel").state == STATE_UNAVAILABLE
+    )
+    assert (
+        hass.states.get("sensor.access_point_5_ghz_tx_retries").state
+        == STATE_UNAVAILABLE
+    )

@@ -12,13 +12,24 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfDataRate
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfDataRate,
+    UnitOfFrequency,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import UnifiNetworkExtendedConfigEntry
-from .api import UnifiDevice, UnifiDeviceDetails, UnifiDeviceStatistics, UnifiPort
+from .api import (
+    UnifiDevice,
+    UnifiDeviceDetails,
+    UnifiDeviceStatistics,
+    UnifiPort,
+    UnifiRadio,
+)
 from .coordinator import UnifiSiteData
 from .entity import (
     UnifiDeviceDetailsEntity,
@@ -26,8 +37,11 @@ from .entity import (
     UnifiDeviceStatisticsEntity,
     UnifiPortEntity,
     UnifiPortEntityDescription,
+    UnifiRadioEntity,
+    UnifiRadioStatisticsEntity,
     UnifiSiteEntity,
     async_setup_port_entities,
+    async_setup_radio_entities,
 )
 
 PARALLEL_UPDATES = 0  # Coordinator based, no per-entity polling.
@@ -324,6 +338,45 @@ DETAILS_SENSORS: tuple[UnifiDetailsSensorDescription, ...] = (
     ),
 )
 
+
+@dataclass(frozen=True, kw_only=True)
+class UnifiRadioSensorDescription(SensorEntityDescription):
+    """Describes a sensor of an access point radio."""
+
+    value_fn: Callable[[UnifiRadio], str | int | None]
+
+
+RADIO_SENSORS: tuple[UnifiRadioSensorDescription, ...] = (
+    UnifiRadioSensorDescription(
+        key="channel",
+        translation_key="radio_channel",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda radio: radio.channel,
+    ),
+    UnifiRadioSensorDescription(
+        key="channel_width",
+        translation_key="radio_channel_width",
+        native_unit_of_measurement=UnitOfFrequency.MEGAHERTZ,
+        device_class=SensorDeviceClass.FREQUENCY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda radio: radio.channel_width_mhz,
+    ),
+    UnifiRadioSensorDescription(
+        key="wlan_standard",
+        translation_key="radio_wlan_standard",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda radio: radio.wlan_standard,
+    ),
+)
+
+RADIO_TX_RETRIES_SENSOR = SensorEntityDescription(
+    key="tx_retries",
+    translation_key="radio_tx_retries",
+    native_unit_of_measurement=PERCENTAGE,
+    state_class=SensorStateClass.MEASUREMENT,
+    suggested_display_precision=1,
+)
+
 UPTIME_SENSOR = SensorEntityDescription(
     key="uptime",
     translation_key="uptime",
@@ -384,6 +437,28 @@ async def async_setup_entry(
 
     _async_add_new_devices()
     entry.async_on_unload(site_coordinator.async_add_listener(_async_add_new_devices))
+
+    async_setup_radio_entities(
+        entry,
+        details_coordinator,
+        lambda details: details.radios,
+        lambda device_id, band: (
+            UnifiRadioSensor(details_coordinator, description, device_id, band)
+            for description in RADIO_SENSORS
+        ),
+        async_add_entities,
+    )
+    async_setup_radio_entities(
+        entry,
+        statistics_coordinator,
+        lambda statistics: statistics.radio_tx_retries_pct,
+        lambda device_id, band: (
+            UnifiRadioTxRetriesSensor(
+                statistics_coordinator, RADIO_TX_RETRIES_SENSOR, device_id, band
+            ),
+        ),
+        async_add_entities,
+    )
 
     async_setup_port_entities(
         entry,
@@ -498,3 +573,27 @@ class UnifiDetailsSensor(UnifiDeviceDetailsEntity, SensorEntity):
         return self.entity_description.value_fn(
             details, self.coordinator.site_coordinator.data
         )
+
+
+class UnifiRadioSensor(UnifiRadioEntity, SensorEntity):
+    """Sensor of an access point radio (channel, channel width, standard)."""
+
+    entity_description: UnifiRadioSensorDescription
+
+    @property
+    def native_value(self) -> str | int | None:
+        """Return the sensor value."""
+        if (radio := self.radio) is None:
+            return None
+        return self.entity_description.value_fn(radio)
+
+
+class UnifiRadioTxRetriesSensor(UnifiRadioStatisticsEntity, SensorEntity):
+    """Share of retransmitted frames of a radio, a sign of interference."""
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the TX retries in percent."""
+        if (statistics := self.coordinator.data.get(self.device_id)) is None:
+            return None
+        return statistics.radio_tx_retries_pct.get(self.band)
