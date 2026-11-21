@@ -11,6 +11,8 @@ from custom_components.unifi_network_extended.binary_sensor import (
 )
 from custom_components.unifi_network_extended.button import POE_POWER_CYCLE
 from custom_components.unifi_network_extended.sensor import (
+    DETAILS_SENSORS,
+    DEVICE_CLIENTS_SENSOR,
     DEVICE_SENSORS,
     DEVICE_STATES,
     PORT_POE_STATES,
@@ -34,6 +36,8 @@ def test_every_sensor_has_an_icon_and_a_name() -> None:
             *DEVICE_SENSORS,
             *STATISTICS_SENSORS,
             *PORT_SENSORS,
+            *DETAILS_SENSORS,
+            DEVICE_CLIENTS_SENSOR,
             UPTIME_SENSOR,
         )
     }

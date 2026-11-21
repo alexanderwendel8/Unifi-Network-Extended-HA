@@ -20,9 +20,9 @@ from .api import (
     UnifiApiError,
     UnifiClient,
     UnifiDevice,
+    UnifiDeviceDetails,
     UnifiDeviceStatistics,
     UnifiInvalidAuth,
-    UnifiPort,
     UnifiSite,
 )
 from .const import DOMAIN, STATISTICS_PARALLEL_REQUESTS
@@ -179,17 +179,13 @@ class UnifiStatisticsCoordinator(_UnifiPerDeviceCoordinator[UnifiDeviceStatistic
         )
 
 
-class UnifiPortsCoordinator(_UnifiPerDeviceCoordinator[dict[int, UnifiPort]]):
-    """Polls the physical ports (link, speed, PoE) of every online device with ports."""
+class UnifiDeviceDetailsCoordinator(_UnifiPerDeviceCoordinator[UnifiDeviceDetails]):
+    """Polls the details (ports, uplink, provisioning) of every online device."""
 
-    _kind = "ports"
+    _kind = "details"
 
-    def _include_device(self, device: UnifiDevice) -> bool:
-        """Only devices that report physical ports."""
-        return super()._include_device(device) and "ports" in device.interfaces
-
-    async def _async_fetch(self, site_id: str, device_id: str) -> dict[int, UnifiPort]:
-        """Fetch the ports of a device."""
-        return await self.site_coordinator.client.async_get_device_ports(
+    async def _async_fetch(self, site_id: str, device_id: str) -> UnifiDeviceDetails:
+        """Fetch the details of a device."""
+        return await self.site_coordinator.client.async_get_device_details(
             site_id, device_id
         )

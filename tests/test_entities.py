@@ -275,3 +275,34 @@ async def test_tracker_describes_client_device(
         (dr.CONNECTION_NETWORK_MAC, PHONE.mac_address.lower())
     }
     assert tracker._attr_device_info["name"] == "Phone"
+
+
+async def test_device_clients_uplink_and_provisioning(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Clients per device, uplink device and last provisioning."""
+    await _setup(hass, config_entry)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    # PHONE is connected to the access point, NAS to the gateway, VPN to nothing.
+    assert _state(hass, f"{GATEWAY.id}_clients") == "1"
+    assert _state(hass, f"{ACCESS_POINT.id}_clients") == "1"
+    assert hass.states.get("sensor.gateway_connected_clients").state == "1"
+
+    # The gateway has no uplink; the offline access point has no details yet.
+    assert _state(hass, f"{GATEWAY.id}_uplink_device") == "unknown"
+    assert _state(hass, f"{ACCESS_POINT.id}_uplink_device") == STATE_UNAVAILABLE
+    assert _state(hass, f"{GATEWAY.id}_last_provisioned") == "2026-11-01T12:00:00+00:00"
+
+    # The access point comes online and reports the gateway as uplink.
+    mock_api["devices"].return_value = [GATEWAY, replace(ACCESS_POINT, state="ONLINE")]
+    for seconds in (DEFAULT_SCAN_INTERVAL, DEFAULT_STATISTICS_INTERVAL):
+        freezer.tick(timedelta(seconds=seconds))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert _state(hass, f"{ACCESS_POINT.id}_uplink_device") == "Gateway"
+    assert hass.states.get("sensor.access_point_uplink_device").state == "Gateway"

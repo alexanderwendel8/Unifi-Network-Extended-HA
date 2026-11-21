@@ -87,6 +87,15 @@
       },
       "port_poe_type": {
         "default": "mdi:flash-outline"
+      },
+      "device_clients": {
+        "default": "mdi:devices"
+      },
+      "uplink_device": {
+        "default": "mdi:lan-connect"
+      },
+      "last_provisioned": {
+        "default": "mdi:cog-sync"
       }
     },
     "binary_sensor": {

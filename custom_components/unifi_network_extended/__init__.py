@@ -30,7 +30,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import (
-    UnifiPortsCoordinator,
+    UnifiDeviceDetailsCoordinator,
     UnifiSiteCoordinator,
     UnifiStatisticsCoordinator,
 )
@@ -52,7 +52,7 @@ class UnifiRuntimeData:
     site: UnifiSite
     site_coordinator: UnifiSiteCoordinator
     statistics_coordinator: UnifiStatisticsCoordinator
-    ports_coordinator: UnifiPortsCoordinator
+    details_coordinator: UnifiDeviceDetailsCoordinator
 
 
 type UnifiNetworkExtendedConfigEntry = ConfigEntry[UnifiRuntimeData]
@@ -106,8 +106,8 @@ async def async_setup_entry(
         site_coordinator,
         entry.options.get(CONF_STATISTICS_INTERVAL, DEFAULT_STATISTICS_INTERVAL),
     )
-    # Ports need the device details, one request per device like the statistics.
-    ports_coordinator = UnifiPortsCoordinator(
+    # Device details (ports, uplink, provisioning): one request per device.
+    details_coordinator = UnifiDeviceDetailsCoordinator(
         hass,
         entry,
         site_coordinator,
@@ -119,7 +119,7 @@ async def async_setup_entry(
         site=site,
         site_coordinator=site_coordinator,
         statistics_coordinator=statistics_coordinator,
-        ports_coordinator=ports_coordinator,
+        details_coordinator=details_coordinator,
     )
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
@@ -130,7 +130,7 @@ async def async_setup_entry(
     # unavailable (statistics) or are added (ports) once the data has arrived.
     entry.async_create_background_task(
         hass,
-        _async_load_device_data(statistics_coordinator, ports_coordinator),
+        _async_load_device_data(statistics_coordinator, details_coordinator),
         f"{DOMAIN} {site.name} initial device data",
     )
     return True
@@ -138,7 +138,7 @@ async def async_setup_entry(
 
 async def _async_load_device_data(
     statistics_coordinator: UnifiStatisticsCoordinator,
-    ports_coordinator: UnifiPortsCoordinator,
+    details_coordinator: UnifiDeviceDetailsCoordinator,
 ) -> None:
     """Run the first refresh of the per-device coordinators in parallel.
 
@@ -146,7 +146,7 @@ async def _async_load_device_data(
     on an invalid API key) and retried at the next interval.
     """
     await asyncio.gather(
-        statistics_coordinator.async_refresh(), ports_coordinator.async_refresh()
+        statistics_coordinator.async_refresh(), details_coordinator.async_refresh()
     )
 
 

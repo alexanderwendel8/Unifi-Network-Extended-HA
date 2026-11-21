@@ -170,15 +170,18 @@ async def test_restart_device(
     assert headers["X-API-KEY"] == "key"
 
 
-async def test_get_device_ports(
+async def test_get_device_details(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """Ports are read from the device details."""
+    """Ports, uplink and provisioning are read from the device details."""
     aioclient_mock.get(
         f"{BASE}/v1/sites/s1/devices/d1",
         json={
             "id": "d1",
             "name": "Switch",
+            "uplink": {"deviceId": "gw"},
+            "provisionedAt": "2026-11-20T10:00:00Z",
+            "adoptedAt": "2025-05-01T08:00:00Z",
             "interfaces": {
                 "ports": [
                     {
@@ -205,8 +208,12 @@ async def test_get_device_ports(
         },
     )
 
-    ports = await _client(hass).async_get_device_ports("s1", "d1")
+    details = await _client(hass).async_get_device_details("s1", "d1")
+    ports = details.ports
 
+    assert details.uplink_device_id == "gw"
+    assert details.provisioned_at.isoformat() == "2026-11-20T10:00:00+00:00"
+    assert details.adopted_at.year == 2025
     assert set(ports) == {1, 9}
     assert ports[1].speed_mbps == 1000
     assert ports[1].poe.enabled is True
@@ -216,15 +223,19 @@ async def test_get_device_ports(
     assert ports[9].poe is None
 
 
-async def test_get_device_ports_without_ports(
+async def test_get_device_details_minimal(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """Devices without ports (e.g. access points) return an empty dict."""
+    """Devices without ports, uplink or timestamps (e.g. the gateway)."""
     aioclient_mock.get(
         f"{BASE}/v1/sites/s1/devices/d1",
         json={"id": "d1", "interfaces": {"radios": []}},
     )
-    assert await _client(hass).async_get_device_ports("s1", "d1") == {}
+    details = await _client(hass).async_get_device_details("s1", "d1")
+    assert details.ports == {}
+    assert details.uplink_device_id is None
+    assert details.provisioned_at is None
+    assert details.adopted_at is None
 
 
 async def test_power_cycle_port(

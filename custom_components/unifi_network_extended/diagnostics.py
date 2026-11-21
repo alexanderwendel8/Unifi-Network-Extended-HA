@@ -38,14 +38,17 @@ async def async_get_config_entry_diagnostics(
                 for device in site_data.devices.values()
             ],
         },
-        "ports_coordinator": {
-            "last_update_success": runtime.ports_coordinator.last_update_success,
-            "device_count": len(runtime.ports_coordinator.data),
-            "port_count": sum(len(p) for p in runtime.ports_coordinator.data.values()),
+        "details_coordinator": {
+            "last_update_success": runtime.details_coordinator.last_update_success,
+            "device_count": len(runtime.details_coordinator.data),
+            "port_count": sum(
+                len(details.ports)
+                for details in runtime.details_coordinator.data.values()
+            ),
             "poe_port_count": sum(
                 port.poe is not None
-                for ports in runtime.ports_coordinator.data.values()
-                for port in ports.values()
+                for details in runtime.details_coordinator.data.values()
+                for port in details.ports.values()
             ),
         },
         "statistics_coordinator": {

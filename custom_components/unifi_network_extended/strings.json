@@ -60,12 +60,12 @@
         "title": "Options",
         "data": {
           "scan_interval": "Update interval for devices and clients",
-          "statistics_interval": "Update interval for device statistics and ports",
+          "statistics_interval": "Update interval for device statistics and details",
           "track_clients": "Track clients"
         },
         "data_description": {
           "scan_interval": "The UniFi Network API offers no push updates, data is polled. Minimum 10 s.",
-          "statistics_interval": "Needs one request per device for statistics and one per switch for ports. Minimum 30 s.",
+          "statistics_interval": "Needs two requests per device (statistics, and details with ports and uplink). Minimum 30 s.",
           "track_clients": "Creates a device tracker for every wired or wireless client. Disabling removes the trackers."
         }
       }
@@ -177,6 +177,15 @@
       },
       "port_poe_type": {
         "name": "Port {port} PoE type"
+      },
+      "device_clients": {
+        "name": "Connected clients"
+      },
+      "uplink_device": {
+        "name": "Uplink device"
+      },
+      "last_provisioned": {
+        "name": "Last provisioned"
       }
     },
     "button": {

@@ -18,9 +18,10 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from . import UnifiNetworkExtendedConfigEntry
-from .api import UnifiDevice, UnifiDeviceStatistics, UnifiPort
+from .api import UnifiDevice, UnifiDeviceDetails, UnifiDeviceStatistics, UnifiPort
 from .coordinator import UnifiSiteData
 from .entity import (
+    UnifiDeviceDetailsEntity,
     UnifiDeviceEntity,
     UnifiDeviceStatisticsEntity,
     UnifiPortEntity,
@@ -284,6 +285,45 @@ PORT_SENSORS: tuple[UnifiPortSensorDescription, ...] = (
     ),
 )
 
+DEVICE_CLIENTS_SENSOR = SensorEntityDescription(
+    key="clients",
+    translation_key="device_clients",
+    state_class=SensorStateClass.MEASUREMENT,
+)
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnifiDetailsSensorDescription(SensorEntityDescription):
+    """Describes a sensor based on the device details."""
+
+    value_fn: Callable[[UnifiDeviceDetails, UnifiSiteData], str | datetime | None]
+
+
+def _uplink_device_name(details: UnifiDeviceDetails, data: UnifiSiteData) -> str | None:
+    """Name of the device this device is connected to (None for the gateway)."""
+    if details.uplink_device_id is None:
+        return None
+    if (uplink := data.devices.get(details.uplink_device_id)) is None:
+        return None
+    return uplink.name
+
+
+DETAILS_SENSORS: tuple[UnifiDetailsSensorDescription, ...] = (
+    UnifiDetailsSensorDescription(
+        key="uplink_device",
+        translation_key="uplink_device",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=_uplink_device_name,
+    ),
+    UnifiDetailsSensorDescription(
+        key="last_provisioned",
+        translation_key="last_provisioned",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda details, data: details.provisioned_at,
+    ),
+)
+
 UPTIME_SENSOR = SensorEntityDescription(
     key="uptime",
     translation_key="uptime",
@@ -300,6 +340,7 @@ async def async_setup_entry(
     """Set up sensors."""
     site_coordinator = entry.runtime_data.site_coordinator
     statistics_coordinator = entry.runtime_data.statistics_coordinator
+    details_coordinator = entry.runtime_data.details_coordinator
 
     async_add_entities(
         UnifiSiteSensor(site_coordinator, description) for description in SITE_SENSORS
@@ -330,6 +371,15 @@ async def async_setup_entry(
                     statistics_coordinator, site_coordinator, UPTIME_SENSOR, device_id
                 )
             )
+            entities.append(
+                UnifiDeviceClientsSensor(
+                    site_coordinator, DEVICE_CLIENTS_SENSOR, device_id
+                )
+            )
+            entities.extend(
+                UnifiDetailsSensor(details_coordinator, description, device_id)
+                for description in DETAILS_SENSORS
+            )
         async_add_entities(entities)
 
     _async_add_new_devices()
@@ -337,7 +387,7 @@ async def async_setup_entry(
 
     async_setup_port_entities(
         entry,
-        entry.runtime_data.ports_coordinator,
+        details_coordinator,
         PORT_SENSORS,
         UnifiPortSensor,
         async_add_entities,
@@ -417,3 +467,34 @@ class UnifiPortSensor(UnifiPortEntity, SensorEntity):
         if (port := self.port) is None:
             return None
         return self.entity_description.value_fn(port)
+
+
+class UnifiDeviceClientsSensor(UnifiDeviceEntity, SensorEntity):
+    """Number of clients connected directly to a device (``uplinkDeviceId``).
+
+    Wireless clients count for their access point, wired clients for their
+    switch or gateway.
+    """
+
+    @property
+    def native_value(self) -> int:
+        """Return the number of connected clients."""
+        return sum(
+            client.uplink_device_id == self.device_id
+            for client in self.coordinator.data.clients.values()
+        )
+
+
+class UnifiDetailsSensor(UnifiDeviceDetailsEntity, SensorEntity):
+    """Sensor based on the device details."""
+
+    entity_description: UnifiDetailsSensorDescription
+
+    @property
+    def native_value(self) -> str | datetime | None:
+        """Return the sensor value."""
+        if (details := self.details) is None:
+            return None
+        return self.entity_description.value_fn(
+            details, self.coordinator.site_coordinator.data
+        )

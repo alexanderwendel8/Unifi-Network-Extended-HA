@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.unifi_network_extended.api import (
     UnifiClient,
     UnifiDevice,
+    UnifiDeviceDetails,
     UnifiDeviceStatistics,
     UnifiPort,
     UnifiPortPoe,
@@ -115,6 +116,25 @@ GATEWAY_STATS = UnifiDeviceStatistics(
     uplink_tx_rate_bps=10_000_000,
 )
 
+# The gateway is connected to nothing (uplink None), the access point to it.
+GATEWAY_DETAILS = UnifiDeviceDetails(
+    ports=GATEWAY_PORTS,
+    uplink_device_id=None,
+    provisioned_at=datetime(2026, 11, 1, 12, 0, tzinfo=UTC),
+    adopted_at=datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+)
+ACCESS_POINT_DETAILS = UnifiDeviceDetails(
+    ports={},
+    uplink_device_id=GATEWAY.id,
+    provisioned_at=None,
+    adopted_at=None,
+)
+
+
+async def _device_details(site_id: str, device_id: str) -> UnifiDeviceDetails:
+    return GATEWAY_DETAILS if device_id == GATEWAY.id else ACCESS_POINT_DETAILS
+
+
 API = "custom_components.unifi_network_extended.api.UnifiApiClient"
 
 
@@ -158,7 +178,9 @@ def mock_api() -> Generator[dict[str, AsyncMock]]:
             f"{API}.async_get_device_statistics", return_value=GATEWAY_STATS
         ) as statistics,
         patch(f"{API}.async_restart_device", return_value=None) as restart,
-        patch(f"{API}.async_get_device_ports", return_value=GATEWAY_PORTS) as ports,
+        patch(
+            f"{API}.async_get_device_details", side_effect=_device_details
+        ) as details,
         patch(f"{API}.async_power_cycle_port", return_value=None) as power_cycle,
     ):
         yield {
@@ -167,6 +189,6 @@ def mock_api() -> Generator[dict[str, AsyncMock]]:
             "clients": clients,
             "statistics": statistics,
             "restart": restart,
-            "ports": ports,
+            "details": details,
             "power_cycle": power_cycle,
         }
