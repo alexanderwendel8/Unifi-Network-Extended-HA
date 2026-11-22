@@ -1,6 +1,10 @@
 {
   "domain": "unifi_network_extended",
   "name": "UniFi Network Extended",
+  "categories": [
+    "computers_network.routers_network",
+    "presence_location.network_presence"
+  ],
   "codeowners": ["@alexanderwendel8"],
   "config_flow": true,
   "dependencies": ["diagnostics"],
