@@ -52,7 +52,8 @@ Getestet an einem echten UniFi-Netz mit folgender Umgebung und folgenden Geräte
 **Am echten Netz geprüft:** Einrichtung mit API-Schlüssel und Standort, alle
 Sensoren und Binärsensoren für Standort, Geräte, Ports und Funkbänder, die
 Uplink-Topologie, Clients pro Gerät, Start im Hintergrund (Einrichtung in rund
-1,5 s) sowie stabile Werte über Reloads und Neustarts von Home Assistant.
+1,5 s), stabile Werte über Reloads und Neustarts von Home Assistant sowie
+Installation und Updates über den Marketplace.
 
 **Noch nicht am echten Netz geprüft** (nur mit automatischen Tests): die Knöpfe
 *Neu starten* und *PoE neu starten*, Neu konfigurieren und erneute Anmeldung,
@@ -63,10 +64,43 @@ Weitere Rückmeldungen zu Geräten gern als
 
 ## Installation
 
-### HACS (benutzerdefiniertes Repository)
+Die Integration ist (noch) nicht im offiziellen Katalog enthalten und wird als
+**benutzerdefiniertes Repository** hinzugefügt.
+
+### Marketplace (ab Home Assistant 2026.11)
+
+Seit Home Assistant 2026.11 ist HACS als **Marketplace** fest in Home Assistant
+eingebaut; HACS muss nicht mehr separat installiert werden (und lässt sich ab
+2026.11 auch nicht mehr installieren).
+
+1. *Einstellungen → Marketplace* öffnen.
+2. Oben rechts **Add from link** wählen.
+3. Unter **GitHub link** `https://github.com/alexanderwendel8/Unifi-Network-Extended-HA`
+   eintragen und **Add** wählen. Falls der Typ nicht erkannt wird, unter **Type**
+   *Integration* auswählen und erneut **Add** wählen.
+4. „UniFi Network Extended“ in der Liste öffnen, installieren und Home Assistant
+   neu starten, wenn eine Reparaturmeldung dazu auffordert.
+
+Zum Hinzufügen eines benutzerdefinierten Repositorys verlangt der Marketplace eine
+Verbindung mit GitHub (nur Lesezugriff auf öffentliche Daten). Neue Versionen
+werden dann alle 48 Stunden geprüft und unter *Einstellungen → Updates*
+angeboten; nach einem Update startet man Home Assistant über die angezeigte
+Reparaturmeldung neu. Standardmäßig werden nur stabile
+[Releases](#releases) angeboten, keine Vorabversionen.
+
+(Bezeichnungen laut der englischen Dokumentation der
+[Marketplace-Integration](https://www.home-assistant.io/integrations/marketplace/);
+in der deutschen Oberfläche können sie abweichen.)
+
+### HACS (bis Home Assistant 2026.10)
+
 1. HACS → Integrationen → ⋮ → *Benutzerdefinierte Repositories*
-2. URL dieses Repositories hinzufügen, Kategorie *Integration*
+2. URL dieses Repositorys hinzufügen, Kategorie *Integration*
 3. „UniFi Network Extended“ installieren und Home Assistant neu starten
+
+Beim Update auf Home Assistant 2026.11 übernimmt der Marketplace die mit HACS
+installierte Integration automatisch – samt benutzerdefiniertem Repository und
+Update-Entität. Es ist nichts weiter zu tun.
 
 ### Manuell
 Ordner `custom_components/unifi_network_extended` nach
@@ -197,4 +231,5 @@ pytest
 Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md). Releases erstellt der Workflow `release.yml`
 mit den Notizen aus dem Changelog – entweder per Tag `vX.Y.Z` oder manuell unter
 *Actions → Release → Run workflow* (auf `main`, Eingabe z. B. `0.1.0`; der Tag wird dann gesetzt).
-Die Version muss zu `manifest.json` passen. HACS zeigt danach die Versionsnummer statt des Commit-Hashs.
+Die Version muss zu `manifest.json` passen. Marketplace bzw. HACS zeigen dann die Versionsnummer
+statt des Commit-Hashs und bieten neue Releases als Update an.
