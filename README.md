@@ -29,8 +29,7 @@ Home Assistant.
 
 ## Getestete Geräte
 
-Getestet an einem echten UniFi-Netz mit einem Standort, rund 60 Clients, 56 Ports
-(davon 32 mit PoE) und 16 Funkbändern:
+Getestet an einem echten UniFi-Netz mit folgender Umgebung und folgenden Geräten:
 
 | Umgebung | Version |
 |---|---|
@@ -38,17 +37,17 @@ Getestet an einem echten UniFi-Netz mit einem Standort, rund 60 Clients, 56 Port
 | UniFi Network Extended | 0.1.0 |
 | UniFi Network API (Spezifikation) | 10.3.58 |
 
-| Gerät | Typ | Firmware | Anzahl |
-|---|---|---|---|
-| UCG Max | Cloud Gateway (Konsole mit UniFi Network) | 6.0.17 | 1 |
-| USW Pro Max 16 PoE | Switch, 16 × RJ45 + 2 × SFP+, PoE | 7.5.15 | 1 |
-| USW Flex 2.5G 8 PoE | Switch, PoE | 2.1.8 | 1 |
-| USW Flex 2.5G 5 | Switch | 2.1.8 | 3 |
-| UDB Switch | Device Bridge (Funk-Brücke mit Switch) | 8.8.14 | 1 |
-| U7 Pro Max | Access Point, Wi-Fi 7 (2,4 / 5 / 6 GHz) | 8.8.14 | 1 |
-| U7 Pro | Access Point, Wi-Fi 7 (2,4 / 5 / 6 GHz) | 8.8.14 | 1 |
-| U7-Pro-Wall | Access Point, Wi-Fi 7 (2,4 / 5 / 6 GHz) | 8.8.14 | 2 |
-| U7 Mesh | Access Point, Wi-Fi 7 (2,4 / 5 GHz) | 8.8.14 | 1 |
+| Gerät | Typ | Firmware |
+|---|---|---|
+| UCG Max | Cloud Gateway (Konsole mit UniFi Network) | 6.0.17 |
+| USW Pro Max 16 PoE | Switch, PoE | 7.5.15 |
+| USW Flex 2.5G 8 PoE | Switch, PoE | 2.1.8 |
+| USW Flex 2.5G 5 | Switch | 2.1.8 |
+| UDB Switch | Device Bridge (Funk-Brücke mit Switch) | 8.8.14 |
+| U7 Pro Max | Access Point, Wi-Fi 7 | 8.8.14 |
+| U7 Pro | Access Point, Wi-Fi 7 | 8.8.14 |
+| U7-Pro-Wall | Access Point, Wi-Fi 7 | 8.8.14 |
+| U7 Mesh | Access Point, Wi-Fi 7 | 8.8.14 |
 
 **Am echten Netz geprüft:** Einrichtung mit API-Schlüssel und Standort, alle
 Sensoren und Binärsensoren für Standort, Geräte, Ports und Funkbänder, die
