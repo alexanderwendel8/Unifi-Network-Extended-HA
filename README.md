@@ -3,11 +3,63 @@
 [![Tests](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/tests.yml/badge.svg)](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/tests.yml) [![Validate](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/validate.yml/badge.svg)](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/validate.yml)
 
 Custom Integration für Home Assistant, die eine UniFi Network Anwendung
-(z. B. UniFi-OS-Konsole wie UDM/UCG/Cloud Key) über die **offizielle
-UniFi Network API** anbindet. Die verwendete Spezifikation liegt unter
-[`docs/unifi-network-api.openapi.json`](docs/unifi-network-api.openapi.json).
+(z. B. auf einer UniFi-OS-Konsole wie UCG, UDM oder Cloud Key) über die
+**offizielle UniFi Network API** anbindet – mit einem API-Schlüssel statt
+Benutzername und Passwort und ohne inoffizielle Endpunkte. Die verwendete
+Spezifikation liegt unter
+[`docs/unifi-network-api.openapi.json`](docs/unifi-network-api.openapi.json)
+(UniFi Network API 10.3.58).
 
-> Status: frühe Entwicklung – Einrichtung, Geräte- und Client-Entitäten sind umgesetzt.
+**Was die Integration bietet:**
+- **Gateways, Switches und Access Points** als Geräte mit Status, CPU- und
+  Speicherauslastung, Uplink-Raten, letztem Neustart, Firmware-Update-Hinweis,
+  verbundenen Clients, Uplink-Gerät (Netzwerk-Topologie) und Knopf *Neu starten*
+- **Jeden Switch-Port** mit Verbindung und Geschwindigkeit, bei PoE-Ports mit
+  PoE-Status und Knopf *PoE neu starten*
+- **Jedes Funkband** der Access Points mit Kanal, Kanalbreite, WLAN-Standard und
+  TX-Wiederholungen
+- **Clients** als Anzahl pro Standort und Gerät sowie optional als Device-Tracker
+  für die Anwesenheitserkennung
+
+Einrichtung und Konfiguration erfolgen vollständig über die Oberfläche von
+Home Assistant.
+
+> **Status:** Version 0.1.0 – an einem echten UniFi-Netz getestet
+> (siehe [Getestete Geräte](#getestete-geräte)).
+
+## Getestete Geräte
+
+Getestet an einem echten UniFi-Netz mit folgender Umgebung und folgenden Geräten:
+
+| Umgebung | Version |
+|---|---|
+| Home Assistant | 2026.11.2 (Home Assistant OS 18.4) |
+| UniFi Network Extended | 0.1.0 |
+| UniFi Network API (Spezifikation) | 10.3.58 |
+
+| Gerät | Typ | Firmware |
+|---|---|---|
+| UCG Max | Cloud Gateway (Konsole mit UniFi Network) | 6.0.17 |
+| USW Pro Max 16 PoE | Switch, PoE | 7.5.15 |
+| USW Flex 2.5G 8 PoE | Switch, PoE | 2.1.8 |
+| USW Flex 2.5G 5 | Switch | 2.1.8 |
+| UDB Switch | Device Bridge (Funk-Brücke mit Switch) | 8.8.14 |
+| U7 Pro Max | Access Point, Wi-Fi 7 | 8.8.14 |
+| U7 Pro | Access Point, Wi-Fi 7 | 8.8.14 |
+| U7-Pro-Wall | Access Point, Wi-Fi 7 | 8.8.14 |
+| U7 Mesh | Access Point, Wi-Fi 7 | 8.8.14 |
+
+**Am echten Netz geprüft:** Einrichtung mit API-Schlüssel und Standort, alle
+Sensoren und Binärsensoren für Standort, Geräte, Ports und Funkbänder, die
+Uplink-Topologie, Clients pro Gerät, Start im Hintergrund (Einrichtung in rund
+1,5 s) sowie stabile Werte über Reloads und Neustarts von Home Assistant.
+
+**Noch nicht am echten Netz geprüft** (nur mit automatischen Tests): die Knöpfe
+*Neu starten* und *PoE neu starten*, Neu konfigurieren und erneute Anmeldung,
+mehrere Standorte und selbst gehostete UniFi-Network-Server.
+
+Weitere Rückmeldungen zu Geräten gern als
+[Issue](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/issues).
 
 ## Installation
 
