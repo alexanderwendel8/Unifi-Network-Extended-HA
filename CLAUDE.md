@@ -15,3 +15,21 @@
 - Tests: `pytest` (siehe `requirements_test.txt`).
 - Releases: Ablauf und wiederverwendbare Vorlage in `.claude/skills/release/SKILL.md`
   (Version in `manifest.json` + Abschnitt in `CHANGELOG.md`, dann Workflow `release.yml` manuell auf `main` starten).
+
+# Quellen zu Home Assistant
+
+- Fragen zu Home Assistant (Verhalten, Menüs, Funktionen, Integrationen wie der
+  Marketplace) werden mit der **offiziellen Home-Assistant-Dokumentation** beantwortet,
+  nicht aus dem Gedächtnis und nicht aus Blogs oder Foren.
+- Die gesamte Doku liegt als Markdown im Repo `home-assistant/home-assistant.io`.
+  Diese Markdown-Dateien statt der HTML-Seiten lesen, z. B. per `curl`:
+  - Integrationen: `source/_integrations/<domain>.markdown`
+    (z. B. `.../current/source/_integrations/marketplace.markdown`)
+  - Allgemeine Doku: `source/_docs/`
+  - Basis-URL: `https://raw.githubusercontent.com/home-assistant/home-assistant.io/current/`
+    (`current` = veröffentlichte Version, `next` = kommende Version)
+- Ergänzend für die Entwicklung der Integration: Entwickler-Doku im Repo
+  `home-assistant/developers.home-assistant` (`docs/`, `blog/`) und der Quellcode von
+  `home-assistant/core` zum passenden Release-Tag (z. B. `.../core/2026.11.2/homeassistant/...`).
+- Gelesene Doku in Antworten, README und Pull Requests als Quelle nennen (Link zur
+  Seite auf home-assistant.io bzw. zur Datei im Repo).
