@@ -227,6 +227,8 @@ class UnifiDeviceStatistics:
     uplink_tx_rate_bps: int | None
     # TX retries in percent per radio band (see radio_band), access points only.
     radio_tx_retries_pct: dict[str, float | None] = field(default_factory=dict)
+    # Time of the last heartbeat, the uptime refers to this moment.
+    last_heartbeat_at: datetime | None = None
 
     @classmethod
     def from_api(cls, data: Mapping[str, Any]) -> UnifiDeviceStatistics:
@@ -246,6 +248,7 @@ class UnifiDeviceStatistics:
                 radio_band(radio["frequencyGHz"]): radio.get("txRetriesPct")
                 for radio in radios
             },
+            last_heartbeat_at=_parse_datetime(data.get("lastHeartbeatAt")),
         )
 
 
