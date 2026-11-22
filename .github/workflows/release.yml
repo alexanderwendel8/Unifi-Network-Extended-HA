@@ -1,0 +1,66 @@
+name: Release
+
+# Erstellt ein GitHub-Release mit den Notizen aus CHANGELOG.md, entweder
+# - beim Push eines Tags vX.Y.Z oder
+# - manuell (workflow_dispatch) auf main mit der Version als Eingabe; dann wird
+#   der Tag vX.Y.Z auf den aktuellen Commit von main gesetzt.
+# In beiden Fällen muss die Version zu manifest.json passen.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version ohne v, z. B. 0.1.0 (muss zu manifest.json passen)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version prüfen und Release Notes extrahieren
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "::error::Manuelle Releases nur von main (aktuell $GITHUB_REF)"
+              exit 1
+            fi
+            version="${INPUT_VERSION#v}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Ungültige Version '$version' (erwartet X.Y.Z)"
+            exit 1
+          fi
+          manifest=$(python3 -c "import json; print(json.load(open('custom_components/unifi_network_extended/manifest.json'))['version'])")
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::Version $version passt nicht zu manifest.json ($manifest)"
+            exit 1
+          fi
+          awk -v v="$version" '
+            $0 ~ "^## " v "$" {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "::error::Kein Abschnitt '## $version' in CHANGELOG.md"
+            exit 1
+          fi
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.meta.outputs.tag }}
+          body_path: release_notes.md

@@ -139,3 +139,10 @@ Neue Funktionen werden ausschließlich gegen die offizielle API aus
 pip install -r requirements_test.txt
 pytest
 ```
+
+## Releases
+
+Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md). Releases erstellt der Workflow `release.yml`
+mit den Notizen aus dem Changelog – entweder per Tag `vX.Y.Z` oder manuell unter
+*Actions → Release → Run workflow* (auf `main`, Eingabe z. B. `0.1.0`; der Tag wird dann gesetzt).
+Die Version muss zu `manifest.json` passen. HACS zeigt danach die Versionsnummer statt des Commit-Hashs.
