@@ -1,5 +1,7 @@
 # UniFi Network Extended für Home Assistant
 
+[![Tests](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/tests.yml/badge.svg)](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/tests.yml) [![Validate](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/validate.yml/badge.svg)](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/validate.yml)
+
 Custom Integration für Home Assistant, die eine UniFi Network Anwendung
 (z. B. UniFi-OS-Konsole wie UDM/UCG/Cloud Key) über die **offizielle
 UniFi Network API** anbindet. Die verwendete Spezifikation liegt unter
@@ -124,6 +126,11 @@ Schütze das `.storage`-Verzeichnis und deine Backups entsprechend
 (Backups von Home Assistant lassen sich verschlüsseln).
 
 ## Entwicklung
+
+Bei jedem Push und Pull Request laufen auf GitHub automatisch:
+- **Tests:** `pytest` mit Python 3.13 und 3.14 (ältere und aktuelle
+  Home-Assistant-Versionen) sowie `ruff` (Lint und Formatierung)
+- **Validate:** `hassfest` (Prüfung durch Home Assistant) und die HACS-Prüfung
 
 Neue Funktionen werden ausschließlich gegen die offizielle API aus
 `docs/unifi-network-api.openapi.json` entwickelt (siehe `CLAUDE.md`).
