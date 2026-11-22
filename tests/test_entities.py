@@ -37,6 +37,22 @@ async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     await hass.async_block_till_done(wait_background_tasks=True)
 
 
+def _get_device(
+    hass: HomeAssistant, entry: MockConfigEntry, device_id: str
+) -> dr.DeviceEntry | None:
+    """Look up a device of the integration by identifier.
+
+    Newer Home Assistant versions replaced async_get_device (identifiers are no
+    longer unique across config entries) with async_get_device_by_identifier.
+    """
+    registry = dr.async_get(hass)
+    if hasattr(registry, "async_get_device_by_identifier"):
+        return registry.async_get_device_by_identifier(
+            (DOMAIN, device_id), entry.entry_id
+        )
+    return registry.async_get_device(identifiers={(DOMAIN, device_id)})
+
+
 def _state(hass: HomeAssistant, unique_id: str, domain: str = "sensor") -> str:
     entity_id = er.async_get(hass).async_get_entity_id(domain, DOMAIN, unique_id)
     assert entity_id, unique_id
@@ -82,10 +98,9 @@ async def test_device_registry(
 ) -> None:
     """UniFi devices are registered below the site device."""
     await _setup(hass, config_entry)
-    registry = dr.async_get(hass)
 
-    site = registry.async_get_device(identifiers={(DOMAIN, SITE.id)})
-    gateway = registry.async_get_device(identifiers={(DOMAIN, GATEWAY.id)})
+    site = _get_device(hass, config_entry, SITE.id)
+    gateway = _get_device(hass, config_entry, GATEWAY.id)
     assert site.name == "Default"
     assert gateway.model == "UCG Ultra"
     assert gateway.sw_version == "4.1.13"
@@ -244,7 +259,7 @@ async def test_device_info_uses_via_device_id_when_supported(
 
     await _setup(hass, config_entry)
     coordinator = config_entry.runtime_data.site_coordinator
-    site_device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, SITE.id)})
+    site_device = _get_device(hass, config_entry, SITE.id)
     assert coordinator.site_device_id == site_device.id
 
     monkeypatch.setattr(entity, "SUPPORTS_VIA_DEVICE_ID", True)
