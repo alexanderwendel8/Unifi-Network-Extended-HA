@@ -12,12 +12,13 @@ from homeassistant.const import (
     STATE_ON,
     STATE_UNAVAILABLE,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
+    mock_restore_cache_with_extra_data,
 )
 
 from custom_components.unifi_network_extended.api import UnifiCannotConnect
@@ -386,3 +387,58 @@ async def test_last_restart_is_stable_across_reloads(
         async_fire_time_changed(hass)
         await hass.async_block_till_done(wait_background_tasks=True)
     assert _state(hass, "dev-gw_uptime") == "2026-11-22T10:03:00+00:00"
+
+
+async def test_last_restart_is_restored(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A restored boot time is kept when the new value is only slightly off."""
+    entity_id = "sensor.gateway_last_restart"
+    restored = datetime(2026, 11, 22, 9, 0, 40, tzinfo=UTC)
+    mock_restore_cache_with_extra_data(
+        hass,
+        [
+            (
+                State(entity_id, restored.isoformat()),
+                {
+                    "native_value": {
+                        "__type": str(datetime),
+                        "isoformat": restored.isoformat(),
+                    },
+                    "native_unit_of_measurement": None,
+                },
+            )
+        ],
+    )
+    # Restore entries need an existing registry entry with the same entity_id.
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{GATEWAY.id}_uptime",
+        config_entry=config_entry,
+        suggested_object_id="gateway_last_restart",
+    )
+
+    # The device reports a boot time 40 seconds earlier: keep the restored value.
+    heartbeat = datetime(2026, 11, 22, 10, 0, 0, tzinfo=UTC)
+    mock_api["statistics"].side_effect = None
+    mock_api["statistics"].return_value = replace(
+        GATEWAY_STATS, uptime_sec=3600, last_heartbeat_at=heartbeat
+    )
+    freezer.move_to(heartbeat + timedelta(seconds=5))
+    await _setup(hass, config_entry)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.states.get(entity_id).state == "2026-11-22T09:00:40+00:00"
+
+    # A real reboot (boot time far away) replaces it.
+    mock_api["statistics"].return_value = replace(
+        GATEWAY_STATS, uptime_sec=30, last_heartbeat_at=heartbeat
+    )
+    for seconds in (DEFAULT_SCAN_INTERVAL, DEFAULT_STATISTICS_INTERVAL):
+        freezer.tick(timedelta(seconds=seconds))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.states.get(entity_id).state == "2026-11-22T09:59:30+00:00"

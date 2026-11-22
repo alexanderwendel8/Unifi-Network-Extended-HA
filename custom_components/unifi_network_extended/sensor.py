@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from homeassistant.components.sensor import (
+    RestoreSensor,
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
@@ -506,29 +507,43 @@ class UnifiStatisticsSensor(UnifiDeviceStatisticsEntity, SensorEntity):
         return self.entity_description.value_fn(stats)
 
 
-class UnifiUptimeSensor(UnifiDeviceStatisticsEntity, SensorEntity):
-    """Time of the last device start, derived from the uptime."""
+# A new boot time is only accepted when it differs by more than this. Smaller
+# differences come from rounding and from uptime and heartbeat not always being
+# reported at exactly the same moment.
+BOOT_TIME_TOLERANCE = timedelta(minutes=2)
+
+
+class UnifiUptimeSensor(UnifiDeviceStatisticsEntity, RestoreSensor):
+    """Time of the last device start, derived from the uptime.
+
+    The value is restored after a restart or reload of Home Assistant and only
+    changes on a real reboot of the device, so automations can trigger on it.
+    """
 
     _last_boot: datetime | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last known boot time."""
+        await super().async_added_to_hass()
+        if (last := await self.async_get_last_sensor_data()) is not None and isinstance(
+            last.native_value, datetime
+        ):
+            self._last_boot = last.native_value
 
     @property
     def native_value(self) -> datetime | None:
         """Return the boot time.
 
         The uptime refers to the last heartbeat of the device, so
-        ``lastHeartbeatAt - uptimeSec`` gives a stable boot time, also after a
-        restart of Home Assistant. Without a heartbeat, ``now - uptime`` is used,
-        which drifts by some seconds; the value then only changes when it moved by
-        more than a minute (i.e. a reboot).
+        ``lastHeartbeatAt - uptimeSec`` gives the boot time independent of when
+        Home Assistant polls; without a heartbeat ``now - uptime`` is used.
         """
         stats = self.statistics
         if stats is None or stats.uptime_sec is None:
             return self._last_boot
         reference = stats.last_heartbeat_at or dt_util.utcnow()
         boot = (reference - timedelta(seconds=stats.uptime_sec)).replace(microsecond=0)
-        if self._last_boot is None or abs(boot - self._last_boot) > timedelta(
-            minutes=1
-        ):
+        if self._last_boot is None or abs(boot - self._last_boot) > BOOT_TIME_TOLERANCE:
             self._last_boot = boot
         return self._last_boot
 
