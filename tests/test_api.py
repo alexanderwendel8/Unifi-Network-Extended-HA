@@ -134,6 +134,7 @@ async def test_get_devices_clients_statistics(
             "uptimeSec": 100,
             "cpuUtilizationPct": 1.5,
             "uplink": {"rxRateBps": 10, "txRateBps": 20},
+            "lastHeartbeatAt": "2026-11-22T10:00:00Z",
             "interfaces": {},
         },
     )
@@ -154,6 +155,7 @@ async def test_get_devices_clients_statistics(
     assert stats.cpu_utilization_pct == 1.5
     assert stats.memory_utilization_pct is None
     assert stats.uplink_tx_rate_bps == 20
+    assert stats.last_heartbeat_at.isoformat() == "2026-11-22T10:00:00+00:00"
 
 
 async def test_restart_device(

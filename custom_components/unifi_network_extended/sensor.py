@@ -515,15 +515,17 @@ class UnifiUptimeSensor(UnifiDeviceStatisticsEntity, SensorEntity):
     def native_value(self) -> datetime | None:
         """Return the boot time.
 
-        Recomputing ``now - uptime`` drifts by a few seconds on every poll, so the
-        value only changes when it moved by more than a minute (i.e. a reboot).
+        The uptime refers to the last heartbeat of the device, so
+        ``lastHeartbeatAt - uptimeSec`` gives a stable boot time, also after a
+        restart of Home Assistant. Without a heartbeat, ``now - uptime`` is used,
+        which drifts by some seconds; the value then only changes when it moved by
+        more than a minute (i.e. a reboot).
         """
         stats = self.statistics
         if stats is None or stats.uptime_sec is None:
             return self._last_boot
-        boot = (dt_util.utcnow() - timedelta(seconds=stats.uptime_sec)).replace(
-            microsecond=0
-        )
+        reference = stats.last_heartbeat_at or dt_util.utcnow()
+        boot = (reference - timedelta(seconds=stats.uptime_sec)).replace(microsecond=0)
         if self._last_boot is None or abs(boot - self._last_boot) > timedelta(
             minutes=1
         ):

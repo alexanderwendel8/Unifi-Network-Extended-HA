@@ -1,7 +1,7 @@
 """Tests for sensors, binary sensors and device trackers."""
 
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 from freezegun.api import FrozenDateTimeFactory
@@ -28,7 +28,7 @@ from custom_components.unifi_network_extended.const import (
     DOMAIN,
 )
 
-from .conftest import ACCESS_POINT, GATEWAY, NAS, PHONE, SITE, VPN_USER
+from .conftest import ACCESS_POINT, GATEWAY, GATEWAY_STATS, NAS, PHONE, SITE, VPN_USER
 
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
@@ -350,3 +350,39 @@ async def test_radio_sensors(
         hass.states.get("sensor.access_point_5_ghz_tx_retries").state
         == STATE_UNAVAILABLE
     )
+
+
+async def test_last_restart_is_stable_across_reloads(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """The boot time is derived from the heartbeat, not from the current time."""
+    heartbeat = datetime(2026, 11, 22, 10, 0, 0, tzinfo=UTC)
+    stats = replace(GATEWAY_STATS, uptime_sec=3600, last_heartbeat_at=heartbeat)
+    mock_api["statistics"].side_effect = None
+    mock_api["statistics"].return_value = stats
+    freezer.move_to(datetime(2026, 11, 22, 10, 0, 37, tzinfo=UTC))
+    await _setup(hass, config_entry)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert _state(hass, "dev-gw_uptime") == "2026-11-22T09:00:00+00:00"
+
+    # Reloading later (e.g. after a Home Assistant restart) keeps the value.
+    freezer.move_to(datetime(2026, 11, 22, 10, 3, 11, tzinfo=UTC))
+    mock_api["statistics"].return_value = replace(
+        stats, uptime_sec=3600 + 180, last_heartbeat_at=heartbeat + timedelta(minutes=3)
+    )
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert _state(hass, "dev-gw_uptime") == "2026-11-22T09:00:00+00:00"
+
+    # A real reboot moves the value.
+    mock_api["statistics"].return_value = replace(
+        stats, uptime_sec=60, last_heartbeat_at=heartbeat + timedelta(minutes=4)
+    )
+    for seconds in (DEFAULT_SCAN_INTERVAL, DEFAULT_STATISTICS_INTERVAL):
+        freezer.tick(timedelta(seconds=seconds))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+    assert _state(hass, "dev-gw_uptime") == "2026-11-22T10:03:00+00:00"
