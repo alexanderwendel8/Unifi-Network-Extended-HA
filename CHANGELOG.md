@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Entwicklung
+- GitHub Actions auf Commit-SHA mit Versionskommentar festgelegt und aktualisiert (Node.js 24):
+  `actions/checkout` v7.0.1, `actions/setup-python` v7.1.0, `softprops/action-gh-release` v3.0.4,
+  `home-assistant/actions/hassfest` 2026.11.0, `hacs/action` 22.5.0
+- Dependabot schlägt Updates der GitHub Actions wöchentlich als Pull Request vor
+
 ## 0.1.0
 
 Erstes Release der Home-Assistant-Integration für UniFi Network über die offizielle UniFi Network API

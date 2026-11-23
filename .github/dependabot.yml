@@ -1,0 +1,13 @@
+# Proposes updates for the GitHub Actions in .github/workflows as pull requests.
+# Actions are pinned to a commit SHA with the version as a comment; Dependabot
+# updates both.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
