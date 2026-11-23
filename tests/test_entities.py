@@ -420,7 +420,9 @@ async def test_last_restart_is_restored(
                 State(entity_id, restored.isoformat()),
                 {
                     "native_value": {
-                        "__type": str(datetime),
+                        # Stored type name as written by Home Assistant; not
+                        # str(datetime), freezegun may replace datetime there.
+                        "__type": "<class 'datetime.datetime'>",
                         "isoformat": restored.isoformat(),
                     },
                     "native_unit_of_measurement": None,

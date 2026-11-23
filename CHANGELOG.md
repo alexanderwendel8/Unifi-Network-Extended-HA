@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Sonstiges
+- Mindestversion Home Assistant 2025.3.0 (wie bisher in `hacs.json`) geprüft und in der README genannt;
+  die CI testet jetzt 2025.3.0, 2026.2.3 und die aktuelle Version mit festgelegten Versionen von
+  `pytest-homeassistant-custom-component` (aktuelle Version per Dependabot aktualisiert)
+
 ## 0.1.0
 
 Erstes Release der Home-Assistant-Integration für UniFi Network über die offizielle UniFi Network API
