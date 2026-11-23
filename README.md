@@ -24,7 +24,7 @@ Spezifikation liegt unter
 Einrichtung und Konfiguration erfolgen vollständig über die Oberfläche von
 Home Assistant.
 
-> **Status:** Version 0.1.1 – an einem echten UniFi-Netz getestet
+> **Status:** Version 0.2.0 – an einem echten UniFi-Netz getestet
 > (siehe [Getestete Geräte](#getestete-geräte)).
 
 ## Getestete Geräte
@@ -34,7 +34,7 @@ Getestet an einem echten UniFi-Netz mit folgender Umgebung und folgenden Geräte
 | Umgebung | Version |
 |---|---|
 | Home Assistant | 2026.11.2 (Home Assistant OS 18.4) |
-| UniFi Network Extended | 0.1.1 |
+| UniFi Network Extended | 0.2.0 |
 | UniFi Network API (Spezifikation) | 10.3.58 |
 | UniFi-Network-Anwendung (Sensor *UniFi-Network-Version*) | 11.0.104 |
 

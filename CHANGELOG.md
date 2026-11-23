@@ -5,6 +5,10 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Dokumentation
+
+- README: Getestete Version auf 0.2.0 aktualisiert (Statuszeile und Tabelle „Getestete Geräte“).
+
 ## 0.2.0
 
 Aufräumen und robustere Einrichtung: Geräte, die UniFi nicht mehr meldet, und Client-Tracker
