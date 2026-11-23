@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 import inspect
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
@@ -28,6 +29,7 @@ from .api import (
 )
 from .const import DOMAIN
 from .coordinator import (
+    UnifiApplicationInfoCoordinator,
     UnifiDeviceDetailsCoordinator,
     UnifiSiteCoordinator,
     UnifiStatisticsCoordinator,
@@ -89,6 +91,24 @@ class UnifiSiteEntity(CoordinatorEntity[UnifiSiteCoordinator]):
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.site.id}_{description.key}"
         self._attr_device_info = site_device_info(coordinator.site)
+
+
+class UnifiApplicationInfoEntity(CoordinatorEntity[UnifiApplicationInfoCoordinator]):
+    """Entity based on the application info, belonging to the site device."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: UnifiApplicationInfoCoordinator,
+        site: UnifiSite,
+        description: EntityDescription,
+    ) -> None:
+        """Initialize the entity."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"{site.id}_{description.key}"
+        self._attr_device_info = site_device_info(site)
 
 
 class UnifiDeviceEntity(CoordinatorEntity[UnifiSiteCoordinator]):
@@ -239,6 +259,27 @@ class UnifiPortEntity(CoordinatorEntity[UnifiDeviceDetailsCoordinator]):
         return super().available and self.port is not None
 
 
+def _async_forget_removed_devices(
+    entry: ConfigEntry,
+    site_coordinator: UnifiSiteCoordinator,
+    known: set[tuple[str, Any]],
+) -> None:
+    """Drop removed devices from a set of known keys after every site update.
+
+    The keys start with the UniFi device ID. Only the site coordinator knows
+    whether a device still exists: the per-device coordinators leave out offline
+    devices (whose entities stay) and update less often. A removed device that
+    comes back (adopted again) then gets new entities.
+    """
+
+    @callback
+    def _async_forget() -> None:
+        devices = site_coordinator.data.devices
+        known.difference_update([key for key in known if key[0] not in devices])
+
+    entry.async_on_unload(site_coordinator.async_add_listener(_async_forget))
+
+
 def async_setup_port_entities[EntityT: Entity](
     entry: ConfigEntry,
     coordinator: UnifiDeviceDetailsCoordinator,
@@ -255,8 +296,11 @@ def async_setup_port_entities[EntityT: Entity](
 
     @callback
     def _async_add_new_ports() -> None:
+        devices = coordinator.site_coordinator.data.devices
         entities: list[EntityT] = []
         for device_id, details in coordinator.data.items():
+            if device_id not in devices:
+                continue
             for port in details.ports.values():
                 if (device_id, port.idx) in known:
                     continue
@@ -271,6 +315,7 @@ def async_setup_port_entities[EntityT: Entity](
 
     _async_add_new_ports()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_ports))
+    _async_forget_removed_devices(entry, coordinator.site_coordinator, known)
 
 
 class _UnifiRadioEntity[
@@ -346,8 +391,11 @@ def async_setup_radio_entities[DataT](
 
     @callback
     def _async_add_new_radios() -> None:
+        devices = coordinator.site_coordinator.data.devices
         entities: list[Entity] = []
         for device_id, data in coordinator.data.items():
+            if device_id not in devices:
+                continue
             for band in bands_fn(data):
                 if (device_id, band) in known:
                     continue
@@ -358,3 +406,4 @@ def async_setup_radio_entities[DataT](
 
     _async_add_new_radios()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_new_radios))
+    _async_forget_removed_devices(entry, coordinator.site_coordinator, known)

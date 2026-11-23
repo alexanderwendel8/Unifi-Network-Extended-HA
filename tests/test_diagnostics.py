@@ -9,6 +9,8 @@ from custom_components.unifi_network_extended.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 
+from .conftest import APPLICATION_VERSION
+
 
 async def test_diagnostics_redacts_secrets(
     hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
@@ -22,6 +24,10 @@ async def test_diagnostics_redacts_secrets(
     assert diagnostics["entry"]["data"]["api_key"] == "**REDACTED**"
     assert diagnostics["entry"]["data"]["host"] == "**REDACTED**"
     assert diagnostics["site_coordinator"]["client_count"] == 3
+    assert diagnostics["application"] == {
+        "last_update_success": True,
+        "version": APPLICATION_VERSION,
+    }
     text = str(diagnostics)
     for secret in ("secret-key", "192.168.1.1", "Phone", "11:22:33:44:55:66"):
         assert secret not in text

@@ -24,7 +24,7 @@ Spezifikation liegt unter
 Einrichtung und Konfiguration erfolgen vollständig über die Oberfläche von
 Home Assistant.
 
-> **Status:** Version 0.1.0 – an einem echten UniFi-Netz getestet
+> **Status:** Version 0.1.1 – an einem echten UniFi-Netz getestet
 > (siehe [Getestete Geräte](#getestete-geräte)).
 
 ## Getestete Geräte
@@ -34,8 +34,9 @@ Getestet an einem echten UniFi-Netz mit folgender Umgebung und folgenden Geräte
 | Umgebung | Version |
 |---|---|
 | Home Assistant | 2026.11.2 (Home Assistant OS 18.4) |
-| UniFi Network Extended | 0.1.0 |
+| UniFi Network Extended | 0.1.1 |
 | UniFi Network API (Spezifikation) | 10.3.58 |
+| UniFi-Network-Anwendung (Sensor *UniFi-Network-Version*) | 11.0.104 |
 
 | Gerät | Typ | Firmware |
 |---|---|---|
@@ -63,6 +64,11 @@ Weitere Rückmeldungen zu Geräten gern als
 [Issue](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/issues).
 
 ## Installation
+
+**Voraussetzung:** Home Assistant **2025.3.0** oder neuer (wie in
+[`hacs.json`](hacs.json) angegeben). Die automatischen Tests laufen gegen diese
+Mindestversion, gegen 2026.2 (letzte Version für Python 3.13) und gegen die
+aktuelle Version.
 
 Die Integration ist (noch) nicht im offiziellen Katalog enthalten und wird als
 **benutzerdefiniertes Repository** hinzugefügt.
@@ -112,7 +118,7 @@ Ordner `custom_components/unifi_network_extended` nach
 
 | Feld | Beschreibung |
 |---|---|
-| Host | Hostname oder IP-Adresse des Controllers |
+| Host | Hostname, IPv4- oder IPv6-Adresse des Controllers, ohne `https://` (z. B. `192.168.1.1`, `unifi.local`, `fd00::1`). Ein eingefügtes `https://`, ein Pfad oder ein Port (`unifi.local:8443`, `[fd00::1]:8443`) werden automatisch bereinigt bzw. ins Feld Port übernommen |
 | Port | meist `443` |
 | API-Schlüssel | Wird im Bereich *Integrationen* der UniFi Network Anwendung erzeugt |
 | SSL-Zertifikat prüfen | Nur bei selbstsignierten Zertifikaten deaktivieren |
@@ -134,6 +140,9 @@ Home Assistant automatisch einen neuen an.
 - Verbundene Clients gesamt, kabelgebunden und WLAN
 - VPN- und Gast-Clients (standardmäßig deaktiviert)
 - Anzahl adoptierter Geräte
+- UniFi-Network-Version (Diagnose): Version der UniFi-Network-Anwendung, zugleich
+  als Firmware-Version des Standort-Geräts angezeigt; wird stündlich geprüft
+  (`GET /v1/info`)
 
 **Pro UniFi-Gerät** (Gateway, Switch, Access Point …)
 - Status (Online, Offline, Wird aktualisiert, …)
@@ -166,6 +175,15 @@ Sie werden nach dem Start im Hintergrund geladen; bis dahin sind die
 Statistik-Sensoren kurz nicht verfügbar und die Port-Entitäten erscheinen,
 sobald ihre Daten da sind. Neu adoptierte Geräte
 erhalten ihre Entitäten automatisch, ohne Neustart.
+
+Geräte, die UniFi nicht mehr meldet (z. B. nach „Gerät vergessen“, Rückgabe oder
+Austausch), werden nach dem nächsten erfolgreichen Abruf automatisch samt ihren
+Entitäten aus Home Assistant entfernt, auch wenn das während eines Neustarts von
+Home Assistant passiert ist. Offline-Geräte meldet UniFi weiterhin, sie bleiben
+erhalten. Schlägt ein Abruf fehl, wird nichts entfernt. Ein solches Gerät lässt
+sich außerdem auf seiner Geräteseite von Hand löschen; Geräte, die UniFi noch
+meldet, und das Standort-Gerät nicht. Wird ein entferntes Gerät erneut adoptiert,
+bekommt es wieder neue Entitäten.
 
 **Clients** (Device-Tracker)
 - Für jeden kabelgebundenen oder WLAN-Client mit MAC-Adresse: *zu Hause*, solange
@@ -218,6 +236,11 @@ regelmäßig ab. Unter *⋮ → Optionen* einstellbar:
 | Abrufintervall Gerätestatistik und Gerätedetails | 60 s | min. 30 s; je zwei Anfragen pro Gerät (Statistik, Details mit Ports und Uplink) |
 | Clients verfolgen | an | Tracker von Clients, die 180 Tage nicht verbunden waren, werden automatisch entfernt (auch eingeschaltete; kommt der Client wieder, entsteht ein neuer Tracker); beim Ausschalten werden alle Tracker und die gespeicherten Verbindungszeiten entfernt |
 
+Die Version der UniFi-Network-Anwendung wird unabhängig davon beim Start und
+danach stündlich abgefragt. Schlägt die Abfrage fehl, startet die Integration
+trotzdem; der Sensor ist dann bis zur nächsten erfolgreichen Abfrage nicht
+verfügbar, die am Standort-Gerät gespeicherte Version bleibt erhalten.
+
 ## Speicherung des API-Schlüssels
 
 Die Daten werden – wie bei allen Core-Integrationen – im Config Entry von
@@ -241,6 +264,10 @@ Bei jedem Push und Pull Request laufen auf GitHub automatisch:
   Home-Assistant-Versionen) sowie `ruff` (Lint und Formatierung)
 - **Validate:** `hassfest` (Prüfung durch Home Assistant) und die HACS-Prüfung
 
+Die verwendeten GitHub Actions sind auf einen Commit-SHA mit der Version als Kommentar
+festgelegt. [Dependabot](.github/dependabot.yml) prüft wöchentlich auf neue Versionen und
+schlägt Updates als Pull Request vor.
+
 Neue Funktionen werden ausschließlich gegen die offizielle API aus
 `docs/unifi-network-api.openapi.json` entwickelt (siehe `CLAUDE.md`).
 
@@ -249,9 +276,26 @@ pip install -r requirements_test.txt
 pytest
 ```
 
+### Testabdeckung
+
+Die Abdeckung (Zeilen und Zweige) misst `pytest-cov`, das mit
+`pytest-homeassistant-custom-component` installiert wird. Die Einstellungen stehen in
+`pyproject.toml` (`[tool.coverage.*]`), der Aufruf folgt der
+[Entwickler-Doku von Home Assistant](https://github.com/home-assistant/developers.home-assistant/blob/master/docs/development_testing.md):
+
+```bash
+pytest --cov --cov-report=term-missing
+```
+
+`Missing` nennt die nicht ausgeführten Zeilen und Zweige. Mit `--cov-report=html` entsteht
+zusätzlich ein Bericht in `htmlcov/`. Die CI zeigt die Abdeckung im Log und in der
+Zusammenfassung des Actions-Laufs und schlägt fehl, wenn sie unter 97 % fällt
+(`--cov-fail-under=97` in `.github/workflows/tests.yml`).
+
 ## Releases
 
-Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md). Releases erstellt der Workflow `release.yml`
+Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md); was noch in keinem Release ist, steht dort
+unter „Unreleased“. Releases erstellt der Workflow `release.yml`
 mit den Notizen aus dem Changelog – entweder per Tag `vX.Y.Z` oder manuell unter
 *Actions → Release → Run workflow* (auf `main`, Eingabe z. B. `0.1.0`; der Tag wird dann gesetzt).
 Die Version muss zu `manifest.json` passen. Marketplace bzw. HACS zeigen dann die Versionsnummer
