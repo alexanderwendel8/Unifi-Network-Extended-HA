@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
     AiohttpClientMockResponse,
 )
+from yarl import URL
 
 from custom_components.unifi_network_extended.api import (
     UnifiApiClient,
@@ -37,6 +38,42 @@ async def test_get_info_sends_api_key(
     assert await _client(hass).async_get_application_version() == "10.3.58"
     _, _, _, headers = aioclient_mock.mock_calls[0]
     assert headers["X-API-KEY"] == "key"
+
+
+@pytest.mark.parametrize(
+    ("host", "port", "url"),
+    [
+        ("unifi.local", 443, "https://unifi.local:443/proxy/network/integration"),
+        ("192.168.1.1", 443, "https://192.168.1.1:443/proxy/network/integration"),
+        ("fd00::1", 443, "https://[fd00::1]:443/proxy/network/integration"),
+        ("fd00::1", 8443, "https://[fd00::1]:8443/proxy/network/integration"),
+    ],
+)
+async def test_base_url(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    host: str,
+    port: int,
+    url: str,
+) -> None:
+    """Hostnames, IPv4 and IPv6 addresses (in brackets) form a valid URL."""
+    aioclient_mock.get(
+        f"{url}/v1/sites",
+        json={"offset": 0, "limit": 200, "count": 0, "totalCount": 0, "data": []},
+    )
+    client = UnifiApiClient(async_get_clientsession(hass), host, port, "key")
+
+    assert await client.async_get_sites() == []
+    _, called, _, _ = aioclient_mock.mock_calls[0]
+    expected = URL(f"{url}/v1/sites")
+    # Compare the parts: yarl omits the default port 443 when printing a URL.
+    assert called.scheme == "https"
+    assert called.raw_host == expected.raw_host
+    assert called.port == port
+    assert called.path == "/proxy/network/integration/v1/sites"
+    assert called.query == {"offset": "0", "limit": "200"}
+    if ":" in host:
+        assert called.human_repr().startswith(f"https://[{host}]")
 
 
 async def test_get_sites_paginates(

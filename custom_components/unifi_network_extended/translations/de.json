@@ -11,7 +11,7 @@
           "verify_ssl": "SSL-Zertifikat prüfen"
         },
         "data_description": {
-          "host": "Hostname oder IP-Adresse der UniFi-Konsole bzw. des Controllers.",
+          "host": "Hostname, IPv4- oder IPv6-Adresse der UniFi-Konsole bzw. des Controllers, ohne https:// (z. B. 192.168.1.1, unifi.local oder fd00::1).",
           "port": "Meist 443 (UniFi-OS-Konsole).",
           "api_key": "Erzeuge einen API-Schlüssel im Bereich „Integrationen“ deiner UniFi Network Anwendung.",
           "verify_ssl": "Nur deaktivieren, wenn der Controller ein selbstsigniertes Zertifikat verwendet."
@@ -31,6 +31,10 @@
           "port": "Port",
           "api_key": "API-Schlüssel",
           "verify_ssl": "SSL-Zertifikat prüfen"
+        },
+        "data_description": {
+          "host": "Hostname, IPv4- oder IPv6-Adresse der UniFi-Konsole bzw. des Controllers, ohne https:// (z. B. 192.168.1.1, unifi.local oder fd00::1).",
+          "port": "Meist 443 (UniFi-OS-Konsole)."
         }
       },
       "reauth_confirm": {
@@ -45,7 +49,8 @@
       "cannot_connect": "Verbindung fehlgeschlagen",
       "invalid_auth": "Ungültiger API-Schlüssel",
       "unknown": "Unerwarteter Fehler",
-      "site_not_found": "Der eingerichtete Standort existiert nicht mehr oder der API-Schlüssel hat keinen Zugriff darauf."
+      "site_not_found": "Der eingerichtete Standort existiert nicht mehr oder der API-Schlüssel hat keinen Zugriff darauf.",
+      "invalid_host": "Ungültiger Host. Gib einen Hostnamen, eine IPv4- oder IPv6-Adresse ohne https:// und ohne Pfad ein. Ein Port gehört ins Feld Port oder wird angehängt, z. B. unifi.local:8443 oder [fd00::1]:8443."
     },
     "abort": {
       "already_configured": "Dieser Standort ist bereits eingerichtet",

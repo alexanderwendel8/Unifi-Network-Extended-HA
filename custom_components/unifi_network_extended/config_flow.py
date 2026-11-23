@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from ipaddress import ip_address
 import logging
+import re
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -32,6 +34,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from homeassistant.util.network import is_host_valid, is_ipv6_address
 import voluptuous as vol
 
 from .api import UnifiApiError, UnifiInvalidAuth, UnifiSite, async_create_api_client
@@ -85,6 +88,60 @@ def _strip_input(user_input: dict[str, Any]) -> None:
     for key in (CONF_HOST, CONF_API_KEY):
         if key in user_input:
             user_input[key] = user_input[key].strip()
+
+
+_SCHEME = re.compile(r"^https?://", re.IGNORECASE)
+_PORT = re.compile(r"^[0-9]{1,5}$")
+
+
+def _parse_host(value: str) -> tuple[str, int | None] | None:
+    """Split a host input into (host, port), or None if it is invalid.
+
+    Accepts a hostname, an IPv4 or an IPv6 address. Tolerates what users often
+    paste instead: an ``http(s)://`` scheme, a trailing slash or path, brackets
+    around an IPv6 address and a port (``host:8443``, ``[fd00::1]:8443``).
+    The returned host has no brackets; the API client adds them for the URL.
+    """
+    host = _SCHEME.sub("", value.strip())
+    # Drop a path, query or fragment ("unifi.local/", "1.2.3.4/manage").
+    host = re.split(r"[/?#]", host, maxsplit=1)[0]
+    port: str | None = None
+
+    if host.startswith("["):
+        # "[fd00::1]" or "[fd00::1]:8443"
+        address, bracket, rest = host[1:].partition("]")
+        if not bracket or (rest and not rest.startswith(":")):
+            return None
+        if not is_ipv6_address(address):
+            return None  # Brackets are only used around IPv6 addresses.
+        host, port = address, rest[1:] if rest else None
+    elif host.count(":") == 1:
+        # "host:8443"; more than one colon is a bare IPv6 address.
+        host, port = host.split(":")
+
+    if port is not None and not (_PORT.match(port) and 1 <= int(port) <= 65535):
+        return None
+    if not host or not is_host_valid(host):
+        return None
+    if ":" in host:
+        # Store IPv6 addresses in their canonical, compressed form.
+        host = str(ip_address(host))
+    return host, int(port) if port is not None else None
+
+
+def _normalize_host(user_input: dict[str, Any]) -> dict[str, str]:
+    """Clean up the host in place; return form errors if it is invalid.
+
+    A port given with the host takes precedence over the port field, because
+    the user typed it explicitly while the port field is pre-filled with 443.
+    """
+    parsed = _parse_host(user_input[CONF_HOST])
+    if parsed is None:
+        return {CONF_HOST: "invalid_host"}
+    user_input[CONF_HOST], port = parsed
+    if port is not None:
+        user_input[CONF_PORT] = port
+    return {}
 
 
 async def _async_fetch_sites(
@@ -147,7 +204,10 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             _strip_input(user_input)
-            sites, errors = await _async_fetch_sites(self.hass, user_input)
+            errors = _normalize_host(user_input)
+            sites: list[UnifiSite] = []
+            if not errors:
+                sites, errors = await _async_fetch_sites(self.hass, user_input)
             if not errors:
                 if not sites:
                     return self.async_abort(reason="no_sites")
@@ -217,9 +277,11 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             _strip_input(user_input)
-            errors = await _async_validate_site(
-                self.hass, {**user_input, CONF_SITE_ID: entry.data[CONF_SITE_ID]}
-            )
+            errors = _normalize_host(user_input)
+            if not errors:
+                errors = await _async_validate_site(
+                    self.hass, {**user_input, CONF_SITE_ID: entry.data[CONF_SITE_ID]}
+                )
             if not errors:
                 return self.async_update_reload_and_abort(
                     entry, data_updates=user_input
@@ -227,7 +289,10 @@ class UnifiNetworkExtendedConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=_connection_schema(entry.data),
+            # Show the user's last input again so a typo can be corrected.
+            data_schema=self.add_suggested_values_to_schema(
+                _connection_schema(entry.data), user_input
+            ),
             errors=errors,
         )
 

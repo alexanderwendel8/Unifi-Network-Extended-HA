@@ -11,7 +11,7 @@
           "verify_ssl": "Verify SSL certificate"
         },
         "data_description": {
-          "host": "Hostname or IP address of the UniFi console or controller.",
+          "host": "Hostname, IPv4 or IPv6 address of the UniFi console or controller, without https:// (e.g. 192.168.1.1, unifi.local or fd00::1).",
           "port": "Usually 443 (UniFi OS console).",
           "api_key": "Create an API key in the Integrations section of your UniFi Network application.",
           "verify_ssl": "Disable only if the controller uses a self-signed certificate."
@@ -31,6 +31,10 @@
           "port": "Port",
           "api_key": "API key",
           "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "host": "Hostname, IPv4 or IPv6 address of the UniFi console or controller, without https:// (e.g. 192.168.1.1, unifi.local or fd00::1).",
+          "port": "Usually 443 (UniFi OS console)."
         }
       },
       "reauth_confirm": {
@@ -45,7 +49,8 @@
       "cannot_connect": "Failed to connect",
       "invalid_auth": "Invalid API key",
       "unknown": "Unexpected error",
-      "site_not_found": "The configured site no longer exists or the API key has no access to it."
+      "site_not_found": "The configured site no longer exists or the API key has no access to it.",
+      "invalid_host": "Invalid host. Enter a hostname, IPv4 or IPv6 address without https:// or a path. A port can be entered in the port field or appended, e.g. unifi.local:8443 or [fd00::1]:8443."
     },
     "abort": {
       "already_configured": "This site is already configured",

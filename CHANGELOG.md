@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Einrichtung
+- Host als Hostname, IPv4- oder IPv6-Adresse; IPv6-Adressen werden in der URL korrekt in
+  eckige Klammern gesetzt (z. B. `https://[fd00::1]:443/...`)
+- Eingabe des Hosts wird bereinigt (Einrichten und Neu konfigurieren): Leerzeichen, `http://`/`https://`,
+  abschließender `/` bzw. Pfad und eckige Klammern um IPv6-Adressen werden entfernt
+- Ein Port in der Host-Eingabe (`unifi.local:8443`, `[fd00::1]:8443`) wird ins Feld Port übernommen
+- Ungültige Hosts werden mit dem Fehler „Ungültiger Host“ abgelehnt, statt eine Verbindung zu versuchen
+- Beim Neu konfigurieren bleiben die Eingaben nach einem Fehler im Formular erhalten
+
 ### Dokumentation
 - Changelog: Abschnitt „Unreleased“ für laufende Änderungen; Release-Ablauf entsprechend angepasst
 - README: „Getestete Geräte“ nennt Version 0.1.1 und die UniFi-Network-Anwendung 11.0.104
