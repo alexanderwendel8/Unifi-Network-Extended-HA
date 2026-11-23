@@ -81,6 +81,28 @@ async def test_offline_device_is_kept(
     assert _entity_ids(hass, ACCESS_POINT.id) == ap_entities
 
 
+async def test_device_with_invalid_data_is_kept(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
+    """A device skipped for invalid data is still reported by UniFi and stays."""
+    await _setup(hass, config_entry)
+    gateway_entities = _entity_ids(hass, GATEWAY.id)
+
+    async def _devices_with_invalid_gateway(
+        site_id: str, *, skipped_ids: set[str] | None = None
+    ) -> list:
+        # The API client skips the gateway and reports its ID as skipped.
+        if skipped_ids is not None:
+            skipped_ids.add(GATEWAY.id)
+        return [ACCESS_POINT]
+
+    mock_api["devices"].side_effect = _devices_with_invalid_gateway
+    await _refresh(config_entry, hass)
+
+    assert _get_device(hass, config_entry, GATEWAY.id) is not None
+    assert _entity_ids(hass, GATEWAY.id) == gateway_entities
+
+
 async def test_failed_update_removes_nothing(
     hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
 ) -> None:

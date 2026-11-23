@@ -78,9 +78,11 @@ class UnifiSiteCoordinator(DataUpdateCoordinator[UnifiSiteData]):
 
     async def _async_update_data(self) -> UnifiSiteData:
         """Fetch devices and clients in parallel."""
+        # Devices UniFi still reports, but with invalid data (skipped).
+        skipped_ids: set[str] = set()
         try:
             devices, clients = await asyncio.gather(
-                self.client.async_get_devices(self.site.id),
+                self.client.async_get_devices(self.site.id, skipped_ids=skipped_ids),
                 self.client.async_get_clients(self.site.id),
             )
         except UnifiInvalidAuth as err:
@@ -89,7 +91,10 @@ class UnifiSiteCoordinator(DataUpdateCoordinator[UnifiSiteData]):
             raise UpdateFailed(str(err)) from err
         # Only reached after a complete, successful fetch: every adopted device
         # (including offline ones) is in the response, so a missing one is gone.
-        self._async_remove_stale_devices({device.id for device in devices})
+        # Devices skipped for invalid data still exist and are kept.
+        self._async_remove_stale_devices(
+            {device.id for device in devices} | skipped_ids
+        )
         return UnifiSiteData(
             devices={device.id: device for device in devices},
             clients={client.id: client for client in clients},

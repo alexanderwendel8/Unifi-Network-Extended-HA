@@ -99,13 +99,24 @@ def _parse_entries[T](
     parse: Callable[[Mapping[str, Any]], T],
     kind: str,
     on_invalid: InvalidEntryCallback | None,
+    skipped_ids: set[str] | None = None,
 ) -> list[T]:
-    """Parse every entry of a list, skipping (and reporting) invalid ones."""
+    """Parse every entry of a list, skipping (and reporting) invalid ones.
+
+    If given, ``skipped_ids`` receives the ``id`` of every skipped entry that
+    has one, so callers can tell "invalid" apart from "no longer reported".
+    """
     result: list[T] = []
     for entry in entries:
         try:
             result.append(parse(_object(entry, kind)))
         except _PARSE_ERRORS as err:
+            if (
+                skipped_ids is not None
+                and isinstance(entry, Mapping)
+                and isinstance(entry_id := entry.get("id"), str)
+            ):
+                skipped_ids.add(entry_id)
             cause = f"{kind} skipped: {_describe_parse_error(err)}"
             if on_invalid is None:
                 _LOGGER.debug("Invalid entry in API response, %s", cause)
@@ -469,6 +480,7 @@ class UnifiApiClient:
         endpoint: str,
         parse: Callable[[Mapping[str, Any]], T],
         kind: str,
+        skipped_ids: set[str] | None = None,
     ) -> list[T]:
         """Fetch all pages of a list endpoint and parse every entry.
 
@@ -480,6 +492,7 @@ class UnifiApiClient:
             parse,
             kind,
             lambda cause: self._report_invalid(endpoint, cause),
+            skipped_ids,
         )
 
     async def async_get_application_version(self) -> str:
@@ -496,13 +509,20 @@ class UnifiApiClient:
             "/v1/sites", "/v1/sites", UnifiSite.from_api, "site"
         )
 
-    async def async_get_devices(self, site_id: str) -> list[UnifiDevice]:
-        """Return all adopted devices (``GET /v1/sites/{siteId}/devices``)."""
+    async def async_get_devices(
+        self, site_id: str, *, skipped_ids: set[str] | None = None
+    ) -> list[UnifiDevice]:
+        """Return all adopted devices (``GET /v1/sites/{siteId}/devices``).
+
+        ``skipped_ids`` receives the IDs of devices that UniFi reports but that
+        were skipped because their data is invalid.
+        """
         return await self._async_get_list(
             f"/v1/sites/{site_id}/devices",
             "/v1/sites/{siteId}/devices",
             UnifiDevice.from_api,
             "device",
+            skipped_ids,
         )
 
     async def async_get_clients(self, site_id: str) -> list[UnifiClient]:

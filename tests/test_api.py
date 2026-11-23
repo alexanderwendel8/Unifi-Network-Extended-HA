@@ -433,11 +433,15 @@ async def test_invalid_devices_are_skipped(
     )
     client = _client(hass)
 
+    skipped_ids: set[str] = set()
     with caplog.at_level(logging.WARNING):
-        devices = await client.async_get_devices("s1")
+        devices = await client.async_get_devices("s1", skipped_ids=skipped_ids)
 
     # A missing (null) list counts as empty, a list with wrong entries not.
     assert [device.id for device in devices] == ["d1", "d4"]
+    # Skipped devices that still have an ID are reported, so they are not
+    # mistaken for removed devices.
+    assert skipped_ids == {"d2", "d3", "d5"}
     assert devices[1].features == frozenset()
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 4
