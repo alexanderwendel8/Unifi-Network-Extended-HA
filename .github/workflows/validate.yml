@@ -17,13 +17,17 @@ jobs:
     name: hassfest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: home-assistant/actions/hassfest@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The pin covers the action; it always runs the latest
+      # ghcr.io/home-assistant/hassfest image, so new Home Assistant rules apply.
+      - uses: home-assistant/actions/hassfest@07f46fd2e19967768b5fd3000f91f857452b767c # 2026.11.0
 
   hacs:
     name: HACS
     runs-on: ubuntu-latest
     steps:
-      - uses: hacs/action@main
+      # 22.5.0 is the latest release tag; action.yml is unchanged on main since then.
+      # It always runs the ghcr.io/hacs/action:main image (current HACS checks).
+      - uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration

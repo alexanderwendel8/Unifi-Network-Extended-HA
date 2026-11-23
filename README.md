@@ -232,6 +232,10 @@ Bei jedem Push und Pull Request laufen auf GitHub automatisch:
   Home-Assistant-Versionen) sowie `ruff` (Lint und Formatierung)
 - **Validate:** `hassfest` (Prüfung durch Home Assistant) und die HACS-Prüfung
 
+Die verwendeten GitHub Actions sind auf einen Commit-SHA mit der Version als Kommentar
+festgelegt. [Dependabot](.github/dependabot.yml) prüft wöchentlich auf neue Versionen und
+schlägt Updates als Pull Request vor.
+
 Neue Funktionen werden ausschließlich gegen die offizielle API aus
 `docs/unifi-network-api.openapi.json` entwickelt (siehe `CLAUDE.md`).
 
