@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL, Platform
@@ -56,6 +57,8 @@ class UnifiRuntimeData:
     statistics_coordinator: UnifiStatisticsCoordinator
     details_coordinator: UnifiDeviceDetailsCoordinator
     application_info_coordinator: UnifiApplicationInfoCoordinator
+    # Options the entry was set up with, to tell option changes from data changes.
+    options: dict[str, Any]
 
 
 type UnifiNetworkExtendedConfigEntry = ConfigEntry[UnifiRuntimeData]
@@ -155,6 +158,7 @@ async def async_setup_entry(
         statistics_coordinator=statistics_coordinator,
         details_coordinator=details_coordinator,
         application_info_coordinator=application_info_coordinator,
+        options=dict(entry.options),
     )
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
@@ -237,8 +241,14 @@ async def _async_load_device_data(
 async def _async_options_updated(
     hass: HomeAssistant, entry: UnifiNetworkExtendedConfigEntry
 ) -> None:
-    """Reload the entry when the options change."""
-    await hass.config_entries.async_reload(entry.entry_id)
+    """Reload the entry when the options change.
+
+    The listener also runs when reconfigure or reauth update the entry data.
+    Those flows reload the entry themselves (``async_update_reload_and_abort``),
+    so reloading here as well would set the entry up twice.
+    """
+    if entry.options != entry.runtime_data.options:
+        await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(

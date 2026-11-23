@@ -2,9 +2,17 @@
 
 import asyncio
 from dataclasses import replace
+from datetime import timedelta
 from unittest.mock import AsyncMock
 
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
+from homeassistant.const import (
+    CONF_API_KEY,
+    CONF_HOST,
+    CONF_PORT,
+    CONF_SCAN_INTERVAL,
+    CONF_VERIFY_SSL,
+)
 from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -14,7 +22,11 @@ from custom_components.unifi_network_extended.api import (
     UnifiDeviceStatistics,
     UnifiInvalidAuth,
 )
-from custom_components.unifi_network_extended.const import DOMAIN
+from custom_components.unifi_network_extended.const import (
+    CONF_STATISTICS_INTERVAL,
+    CONF_TRACK_CLIENTS,
+    DOMAIN,
+)
 
 from .conftest import ACCESS_POINT, GATEWAY, GATEWAY_STATS, SITE
 
@@ -155,3 +167,85 @@ async def test_device_data_unexpected_error(
     assert not coordinator.last_update_success
     assert "boom" in caplog.text
     assert hass.states.get("sensor.gateway_cpu_utilization").state == "unavailable"
+
+
+async def _count_setups(
+    hass: HomeAssistant, mock_api: dict[str, AsyncMock], before: int
+) -> int:
+    """Return how often the entry was set up since ``before`` device fetches.
+
+    Every setup fetches the device list once (first refresh of the site
+    coordinator); the next regular update is minutes away.
+    """
+    await hass.async_block_till_done(wait_background_tasks=True)
+    return mock_api["devices"].await_count - before
+
+
+async def test_reconfigure_reloads_once(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
+    """Reconfigure reloads the entry once, not again via the update listener."""
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    before = mock_api["devices"].await_count
+
+    result = await config_entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_HOST: "192.168.1.2",
+            CONF_PORT: 443,
+            CONF_API_KEY: "secret-key",
+            CONF_VERIFY_SSL: True,
+        },
+    )
+    assert result["reason"] == "reconfigure_successful"
+
+    assert await _count_setups(hass, mock_api, before) == 1
+    assert config_entry.state is ConfigEntryState.LOADED
+    assert config_entry.data[CONF_HOST] == "192.168.1.2"
+
+
+async def test_reauth_reloads_once(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
+    """A new API key reloads the entry once, not again via the update listener."""
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    before = mock_api["devices"].await_count
+
+    result = await config_entry.start_reauth_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_API_KEY: "new-key"}
+    )
+    assert result["reason"] == "reauth_successful"
+
+    assert await _count_setups(hass, mock_api, before) == 1
+    assert config_entry.data[CONF_API_KEY] == "new-key"
+
+
+async def test_options_change_reloads_once(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
+    """Changed options reload the entry (once); unchanged options do not."""
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    before = mock_api["devices"].await_count
+
+    options = {
+        CONF_SCAN_INTERVAL: 60,
+        CONF_STATISTICS_INTERVAL: 120,
+        CONF_TRACK_CLIENTS: True,
+    }
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], options)
+    assert await _count_setups(hass, mock_api, before) == 1
+    assert config_entry.runtime_data.site_coordinator.update_interval == timedelta(
+        seconds=60
+    )
+
+    # Saving the same options again does not reload.
+    before = mock_api["devices"].await_count
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], options)
+    assert await _count_setups(hass, mock_api, before) == 0
