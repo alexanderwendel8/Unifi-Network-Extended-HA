@@ -461,6 +461,7 @@ async def test_last_restart_is_restored(
     assert hass.states.get(entity_id).state == "2026-11-22T09:59:30+00:00"
 
 
+API_INFO = "https://192.168.1.1/proxy/network/integration/v1/info"
 API_SITES = "https://192.168.1.1/proxy/network/integration/v1/sites"
 API_BASE = f"{API_SITES}/{SITE.id}"
 # Personal data of invalid entries; it must never appear in the log.
@@ -508,6 +509,8 @@ async def test_invalid_api_data_only_affects_the_invalid_entries(
     broken_device = _api_device("dev-new", "New device", SECRET_MAC)
     del broken_device["state"]
     port = {"idx": 1, "state": "UP", "connector": "RJ45", "maxSpeedMbps": 2500}
+    # Network application version (GET /v1/info), queried since the version sensor.
+    aioclient_mock.get(API_INFO, json={"applicationVersion": "10.3.58"})
     aioclient_mock.get(
         f"{API_SITES}?offset=0&limit=200",
         json=_api_page(
