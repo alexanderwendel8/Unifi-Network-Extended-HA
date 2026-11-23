@@ -8,6 +8,20 @@
   Standort-Gerät und in den Diagnosedaten. Abfrage beim Start und danach stündlich; ein Fehler
   dabei verhindert den Start nicht, ein ungültiger API-Schlüssel startet die erneute Anmeldung.
 
+### Behoben
+- Firmware-Version und Name der UniFi-Geräte werden im Geräteregister von Home Assistant bei jedem
+  Abruf aktualisiert, ohne die Integration neu zu laden. Ein in Home Assistant vergebener Name
+  bleibt erhalten.
+- Ein einzelner unerwartet aufgebauter Datensatz der UniFi-API (fehlendes Pflichtfeld oder
+  unerwarteter Typ, z. B. nach einem Firmware-Update oder bei einem neuen Gerätetyp) macht
+  nicht mehr alle Entitäten unverfügbar: Betroffene Standorte, Geräte, Clients, Ports und
+  Funkbänder werden übersprungen, alle übrigen funktionieren weiter.
+- Sind Statistik oder Details eines Geräts nicht auslesbar, betrifft das nur dieses Gerät.
+- Ungültiges JSON (z. B. eine HTML-Seite statt einer API-Antwort) wird als unerwartete Antwort
+  gemeldet, nicht mehr als „nicht erreichbar“.
+- Übersprungene Daten werden je Ursache einmal als Warnung protokolliert, mit Endpunkt und
+  Feldname, aber ohne API-Schlüssel, Host, Namen, MAC-Adressen oder IDs.
+
 ### Sonstiges
 - Mindestversion Home Assistant 2025.3.0 (wie bisher in `hacs.json`) geprüft und in der README genannt;
   die CI testet jetzt 2025.3.0, 2026.2.3 und die aktuelle Version mit festgelegten Versionen von
