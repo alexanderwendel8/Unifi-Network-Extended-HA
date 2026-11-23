@@ -102,6 +102,20 @@ async def test_all_sites_configured_aborts(hass: HomeAssistant) -> None:
     assert result["reason"] == "already_configured"
 
 
+async def test_all_of_several_sites_configured_aborts(hass: HomeAssistant) -> None:
+    """Abort instead of showing an empty selection when no site is left."""
+    _entry(hass)
+    MockConfigEntry(
+        domain=DOMAIN,
+        title="Office",
+        unique_id=OFFICE_SITE.id,
+        data={**USER_INPUT, CONF_SITE_ID: OFFICE_SITE.id},
+    ).add_to_hass(hass)
+    result = await _start_user_flow(hass, [DEFAULT_SITE, OFFICE_SITE])
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
 async def test_no_sites_aborts(hass: HomeAssistant) -> None:
     """Abort when the API key sees no sites."""
     result = await _start_user_flow(hass, [])
@@ -219,3 +233,126 @@ async def test_options_flow(hass: HomeAssistant) -> None:
         "statistics_interval": 120,
         "track_clients": False,
     }
+
+
+@pytest.mark.parametrize(
+    ("host", "expected_host", "expected_port"),
+    [
+        ("192.168.1.1", "192.168.1.1", 443),
+        ("https://192.168.1.1/", "192.168.1.1", 443),
+        ("HTTP://192.168.1.1/manage/default", "192.168.1.1", 443),
+        ("  unifi.local  ", "unifi.local", 443),
+        ("https://unifi.local/", "unifi.local", 443),
+        ("fd00::1", "fd00::1", 443),
+        ("[fd00::1]", "fd00::1", 443),
+        ("https://[FD00:0::1]/", "fd00::1", 443),
+        # A port in the host input replaces the port field.
+        ("unifi.local:8443", "unifi.local", 8443),
+        ("https://192.168.1.1:8443/", "192.168.1.1", 8443),
+        ("[fd00::1]:8443", "fd00::1", 8443),
+    ],
+)
+async def test_user_flow_normalizes_host(
+    hass: HomeAssistant, host: str, expected_host: str, expected_port: int
+) -> None:
+    """Scheme, path, brackets and whitespace are removed; a port is taken over."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    with patch(GET_SITES, return_value=[DEFAULT_SITE]):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**USER_INPUT, CONF_HOST: host}
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_HOST] == expected_host
+    assert result["data"][CONF_PORT] == expected_port
+
+
+INVALID_HOSTS = [
+    "",
+    "   ",
+    "https://",
+    "https:///",
+    "unifi local",
+    "unifi_local!",
+    "-unifi.local",
+    "192.168.1.300",
+    "user@192.168.1.1",
+    "unifi.local:",
+    "unifi.local:0",
+    "unifi.local:65536",
+    "unifi.local:https",
+    "[fd00::1",
+    "[fd00::1]8443",
+    "[unifi.local]",
+    "fd00:::1",
+    "ftp://192.168.1.1",
+]
+
+
+@pytest.mark.parametrize("host", INVALID_HOSTS)
+async def test_user_flow_invalid_host(hass: HomeAssistant, host: str) -> None:
+    """Invalid hosts are rejected without trying to connect."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    with patch(GET_SITES, return_value=[DEFAULT_SITE]) as get_sites:
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**USER_INPUT, CONF_HOST: host}
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "user"
+    assert result["errors"] == {CONF_HOST: "invalid_host"}
+    get_sites.assert_not_called()
+
+    # The flow recovers once the host is corrected.
+    with patch(GET_SITES, return_value=[DEFAULT_SITE]):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], USER_INPUT
+        )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+@pytest.mark.parametrize(
+    ("host", "expected_host", "expected_port"),
+    [
+        ("https://192.168.1.1/", "192.168.1.1", 443),
+        ("  unifi.local  ", "unifi.local", 443),
+        ("[fd00::1]", "fd00::1", 443),
+        ("fd00::1", "fd00::1", 443),
+        ("[fd00::1]:8443", "fd00::1", 8443),
+        ("unifi.local:8443", "unifi.local", 8443),
+    ],
+)
+async def test_reconfigure_normalizes_host(
+    hass: HomeAssistant, host: str, expected_host: str, expected_port: int
+) -> None:
+    """The reconfigure step cleans up the host like the user step."""
+    entry = _entry(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(GET_SITES, return_value=[DEFAULT_SITE]):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**USER_INPUT, CONF_HOST: host}
+        )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_HOST] == expected_host
+    assert entry.data[CONF_PORT] == expected_port
+
+
+@pytest.mark.parametrize("host", INVALID_HOSTS)
+async def test_reconfigure_invalid_host(hass: HomeAssistant, host: str) -> None:
+    """The reconfigure step rejects invalid hosts and keeps the entry unchanged."""
+    entry = _entry(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(GET_SITES, return_value=[DEFAULT_SITE]) as get_sites:
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {**USER_INPUT, CONF_HOST: host}
+        )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reconfigure"
+    assert result["errors"] == {CONF_HOST: "invalid_host"}
+    get_sites.assert_not_called()
+    assert entry.data == ENTRY_DATA

@@ -18,6 +18,8 @@ CONF_TRACK_CLIENTS: Final = "track_clients"
 DEFAULT_SCAN_INTERVAL: Final = 30
 DEFAULT_STATISTICS_INTERVAL: Final = 60
 DEFAULT_TRACK_CLIENTS: Final = True
+# The Network application version rarely changes; check it once per hour.
+APPLICATION_INFO_INTERVAL: Final = 3600
 
 # Limit parallel statistics requests (one request per device).
 STATISTICS_PARALLEL_REQUESTS: Final = 4

@@ -29,6 +29,7 @@ from .api import (
 )
 from .const import DOMAIN
 from .coordinator import (
+    UnifiApplicationInfoCoordinator,
     UnifiDeviceDetailsCoordinator,
     UnifiSiteCoordinator,
     UnifiStatisticsCoordinator,
@@ -90,6 +91,24 @@ class UnifiSiteEntity(CoordinatorEntity[UnifiSiteCoordinator]):
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.site.id}_{description.key}"
         self._attr_device_info = site_device_info(coordinator.site)
+
+
+class UnifiApplicationInfoEntity(CoordinatorEntity[UnifiApplicationInfoCoordinator]):
+    """Entity based on the application info, belonging to the site device."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: UnifiApplicationInfoCoordinator,
+        site: UnifiSite,
+        description: EntityDescription,
+    ) -> None:
+        """Initialize the entity."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"{site.id}_{description.key}"
+        self._attr_device_info = site_device_info(site)
 
 
 class UnifiDeviceEntity(CoordinatorEntity[UnifiSiteCoordinator]):
