@@ -21,6 +21,8 @@ from custom_components.unifi_network_extended.api import (
 )
 from custom_components.unifi_network_extended.const import CONF_SITE_ID, DOMAIN
 
+APPLICATION_VERSION = "10.3.58"
+
 SITE = UnifiSite("site-default", "Default", "default")
 
 GATEWAY = UnifiDevice(
@@ -191,6 +193,9 @@ def config_entry(hass: HomeAssistant) -> MockConfigEntry:
 def mock_api() -> Generator[dict[str, AsyncMock]]:
     """Patch all API client methods with sample data."""
     with (
+        patch(
+            f"{API}.async_get_application_version", return_value=APPLICATION_VERSION
+        ) as application_version,
         patch(f"{API}.async_get_sites", return_value=[SITE]) as sites,
         patch(
             f"{API}.async_get_devices", return_value=[GATEWAY, ACCESS_POINT]
@@ -208,6 +213,7 @@ def mock_api() -> Generator[dict[str, AsyncMock]]:
         patch(f"{API}.async_power_cycle_port", return_value=None) as power_cycle,
     ):
         yield {
+            "application_version": application_version,
             "sites": sites,
             "devices": devices,
             "clients": clients,

@@ -107,6 +107,9 @@
       "devices": {
         "name": "Adopted devices"
       },
+      "network_version": {
+        "name": "UniFi Network version"
+      },
       "device_state": {
         "name": "State",
         "state": {

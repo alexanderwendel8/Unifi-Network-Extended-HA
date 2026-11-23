@@ -6,7 +6,7 @@ Only endpoints from the official OpenAPI specification in
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 import logging
@@ -26,9 +26,92 @@ REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=15)
 PAGE_LIMIT = 200  # Maximum page size allowed by the API.
 
 
-def _parse_datetime(value: str | None) -> datetime | None:
-    """Parse an ISO 8601 timestamp of the API, None if missing."""
+# Gets the cause of a skipped entry, e.g. "port skipped: field 'idx' is missing".
+type InvalidEntryCallback = Callable[[str], None]
+
+
+class InvalidFieldError(ValueError):
+    """A field of an API object is missing or has an unexpected type.
+
+    The message names the field, never its value: values can contain personal
+    data such as client names or MAC addresses.
+    """
+
+
+def _check_type(field_name: str, value: Any, expected: type | tuple[type, ...]) -> Any:
+    """Return the value if it has the expected type (bool is no number)."""
+    if not isinstance(value, expected) or (
+        isinstance(value, bool)
+        and bool not in (expected if isinstance(expected, tuple) else (expected,))
+    ):
+        raise InvalidFieldError(f"field '{field_name}' has an unexpected type")
+    return value
+
+
+def _object(value: Any, name: str = "response") -> Mapping[str, Any]:
+    """Return the value if it is a JSON object."""
+    if not isinstance(value, Mapping):
+        raise InvalidFieldError(f"{name} is not an object")
+    return value
+
+
+def _required(
+    data: Mapping[str, Any], key: str, expected: type | tuple[type, ...]
+) -> Any:
+    """Return a field that is required in the specification."""
+    if data.get(key) is None:
+        raise InvalidFieldError(f"field '{key}' is missing")
+    return _check_type(key, data[key], expected)
+
+
+def _optional(
+    data: Mapping[str, Any], key: str, expected: type | tuple[type, ...]
+) -> Any:
+    """Return an optional field of the specification, None if missing."""
+    value = data.get(key)
+    return None if value is None else _check_type(key, value, expected)
+
+
+_NUMBER = (int, float)
+
+
+def _parse_datetime(data: Mapping[str, Any], key: str) -> datetime | None:
+    """Parse an optional ISO 8601 timestamp of the API, None if missing."""
+    value = _optional(data, key, str)
     return dt_util.parse_datetime(value) if value else None
+
+
+def _describe_parse_error(err: Exception) -> str:
+    """Describe a parse error without the values of the response."""
+    if isinstance(err, InvalidFieldError):
+        return str(err)
+    if isinstance(err, KeyError):
+        return "a required field is missing"
+    return f"unexpected value ({type(err).__name__})"
+
+
+# Errors raised while reading API objects: missing fields, unexpected types or values.
+_PARSE_ERRORS = (KeyError, TypeError, ValueError)
+
+
+def _parse_entries[T](
+    entries: Iterable[Any],
+    parse: Callable[[Mapping[str, Any]], T],
+    kind: str,
+    on_invalid: InvalidEntryCallback | None,
+) -> list[T]:
+    """Parse every entry of a list, skipping (and reporting) invalid ones."""
+    result: list[T] = []
+    for entry in entries:
+        try:
+            result.append(parse(_object(entry, kind)))
+        except _PARSE_ERRORS as err:
+            cause = f"{kind} skipped: {_describe_parse_error(err)}"
+            if on_invalid is None:
+                _LOGGER.debug("Invalid entry in API response, %s", cause)
+            else:
+                on_invalid(cause)
+    return result
 
 
 class UnifiApiError(Exception):
@@ -43,6 +126,10 @@ class UnifiInvalidAuth(UnifiApiError):
     """Raised when the API key is missing, invalid or lacks permissions."""
 
 
+class UnifiResponseError(UnifiApiError):
+    """Raised when a response cannot be read (invalid JSON, unexpected content)."""
+
+
 @dataclass(frozen=True, slots=True)
 class UnifiSite:
     """A local site (``GET /v1/sites``)."""
@@ -50,6 +137,15 @@ class UnifiSite:
     id: str
     name: str
     internal_reference: str
+
+    @classmethod
+    def from_api(cls, data: Mapping[str, Any]) -> UnifiSite:
+        """Create from a "Site overview" object."""
+        return cls(
+            id=_required(data, "id", str),
+            name=_required(data, "name", str),
+            internal_reference=_required(data, "internalReference", str),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,19 +165,29 @@ class UnifiDevice:
 
     @classmethod
     def from_api(cls, data: Mapping[str, Any]) -> UnifiDevice:
-        """Create from an "Adopted device overview" object."""
+        """Create from an "Adopted device overview" object.
+
+        ``features`` and ``interfaces`` are required in the specification but
+        only used as sets, so a missing list is read as empty.
+        """
         return cls(
-            id=data["id"],
-            name=data["name"],
-            model=data["model"],
-            mac_address=data["macAddress"],
-            ip_address=data["ipAddress"],
-            state=data["state"],
-            firmware_version=data.get("firmwareVersion", ""),
-            firmware_updatable=data["firmwareUpdatable"],
-            features=frozenset(data.get("features", ())),
-            interfaces=frozenset(data.get("interfaces", ())),
+            id=_required(data, "id", str),
+            name=_required(data, "name", str),
+            model=_required(data, "model", str),
+            mac_address=_required(data, "macAddress", str),
+            ip_address=_required(data, "ipAddress", str),
+            state=_required(data, "state", str),
+            firmware_version=_optional(data, "firmwareVersion", str) or "",
+            firmware_updatable=_required(data, "firmwareUpdatable", bool),
+            features=_string_set(data, "features"),
+            interfaces=_string_set(data, "interfaces"),
         )
+
+
+def _string_set(data: Mapping[str, Any], key: str) -> frozenset[str]:
+    """Read an optional list of strings as a set."""
+    values = _optional(data, key, list) or []
+    return frozenset(_check_type(key, value, str) for value in values)
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +198,17 @@ class UnifiPortPoe:
     state: str  # UP, DOWN, LIMITED or UNKNOWN
     standard: str  # 802.3af, 802.3at or 802.3bt
     type: int  # 1-4
+
+    @classmethod
+    def from_api(cls, data: Mapping[str, Any]) -> UnifiPortPoe:
+        """Create from a "Port PoE overview" object."""
+        return cls(
+            enabled=_required(data, "enabled", bool),
+            state=_required(data, "state", str),
+            standard=_required(data, "standard", str),
+            # Integer enum 1-4; int() also accepts the value as a string.
+            type=int(_required(data, "type", (int, str))),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,23 +225,14 @@ class UnifiPort:
     @classmethod
     def from_api(cls, data: Mapping[str, Any]) -> UnifiPort:
         """Create from a "Port overview" object."""
-        poe = data.get("poe")
+        poe = _optional(data, "poe", Mapping)
         return cls(
-            idx=data["idx"],
-            state=data["state"],
-            connector=data["connector"],
-            max_speed_mbps=data["maxSpeedMbps"],
-            speed_mbps=data.get("speedMbps"),
-            poe=(
-                UnifiPortPoe(
-                    enabled=poe["enabled"],
-                    state=poe["state"],
-                    standard=poe["standard"],
-                    type=int(poe["type"]),
-                )
-                if poe
-                else None
-            ),
+            idx=_required(data, "idx", int),
+            state=_required(data, "state", str),
+            connector=_required(data, "connector", str),
+            max_speed_mbps=_required(data, "maxSpeedMbps", int),
+            speed_mbps=_optional(data, "speedMbps", int),
+            poe=UnifiPortPoe.from_api(poe) if poe else None,
         )
 
 
@@ -146,10 +254,10 @@ class UnifiRadio:
     def from_api(cls, data: Mapping[str, Any]) -> UnifiRadio:
         """Create from a "Wireless radio overview" object."""
         return cls(
-            frequency_ghz=data["frequencyGHz"],
-            wlan_standard=data["wlanStandard"],
-            channel_width_mhz=data["channelWidthMHz"],
-            channel=data.get("channel"),
+            frequency_ghz=_required(data, "frequencyGHz", _NUMBER),
+            wlan_standard=_required(data, "wlanStandard", str),
+            channel_width_mhz=_required(data, "channelWidthMHz", int),
+            channel=_optional(data, "channel", int),
         )
 
 
@@ -165,20 +273,36 @@ class UnifiDeviceDetails:
     radios: dict[str, UnifiRadio] = field(default_factory=dict)
 
     @classmethod
-    def from_api(cls, data: Mapping[str, Any]) -> UnifiDeviceDetails:
-        """Create from an "Adopted device details" object."""
-        interfaces = data.get("interfaces") or {}
-        ports = interfaces.get("ports") or []
-        radios = interfaces.get("radios") or []
+    def from_api(
+        cls,
+        data: Mapping[str, Any],
+        on_invalid: InvalidEntryCallback | None = None,
+    ) -> UnifiDeviceDetails:
+        """Create from an "Adopted device details" object.
+
+        Invalid ports and radios are skipped and reported to ``on_invalid``.
+        """
+        data = _object(data)
+        interfaces = _optional(data, "interfaces", Mapping) or {}
+        ports = _parse_entries(
+            _optional(interfaces, "ports", list) or [],
+            UnifiPort.from_api,
+            "port",
+            on_invalid,
+        )
+        radios = _parse_entries(
+            _optional(interfaces, "radios", list) or [],
+            UnifiRadio.from_api,
+            "radio",
+            on_invalid,
+        )
+        uplink = _optional(data, "uplink", Mapping) or {}
         return cls(
-            radios={
-                radio_band(radio["frequencyGHz"]): UnifiRadio.from_api(radio)
-                for radio in radios
-            },
-            ports={port["idx"]: UnifiPort.from_api(port) for port in ports},
-            uplink_device_id=(data.get("uplink") or {}).get("deviceId"),
-            provisioned_at=_parse_datetime(data.get("provisionedAt")),
-            adopted_at=_parse_datetime(data.get("adoptedAt")),
+            radios={radio_band(radio.frequency_ghz): radio for radio in radios},
+            ports={port.idx: port for port in ports},
+            uplink_device_id=_optional(uplink, "deviceId", str),
+            provisioned_at=_parse_datetime(data, "provisionedAt"),
+            adopted_at=_parse_datetime(data, "adoptedAt"),
         )
 
 
@@ -197,17 +321,22 @@ class UnifiClient:
 
     @classmethod
     def from_api(cls, data: Mapping[str, Any]) -> UnifiClient:
-        """Create from a "Client overview" object."""
-        connected_at = data.get("connectedAt")
+        """Create from a "Client overview" object.
+
+        ``access`` is required in the specification, but only its optional
+        ``type`` is used, so a missing object is read as an unknown type.
+        """
         return cls(
-            id=data["id"],
-            name=data["name"],
-            type=data["type"],
-            mac_address=data.get("macAddress"),
-            ip_address=data.get("ipAddress"),
-            connected_at=_parse_datetime(connected_at),
-            uplink_device_id=data.get("uplinkDeviceId"),
-            access_type=(data.get("access") or {}).get("type"),
+            id=_required(data, "id", str),
+            name=_required(data, "name", str),
+            type=_required(data, "type", str),
+            mac_address=_optional(data, "macAddress", str),
+            ip_address=_optional(data, "ipAddress", str),
+            connected_at=_parse_datetime(data, "connectedAt"),
+            uplink_device_id=_optional(data, "uplinkDeviceId", str),
+            access_type=_optional(
+                _optional(data, "access", Mapping) or {}, "type", str
+            ),
         )
 
 
@@ -232,25 +361,44 @@ class UnifiDeviceStatistics:
     last_heartbeat_at: datetime | None = None
 
     @classmethod
-    def from_api(cls, data: Mapping[str, Any]) -> UnifiDeviceStatistics:
-        """Create from a "Latest statistics for a device" object."""
-        uplink = data.get("uplink") or {}
-        radios = (data.get("interfaces") or {}).get("radios") or []
-        return cls(
-            uptime_sec=data.get("uptimeSec"),
-            cpu_utilization_pct=data.get("cpuUtilizationPct"),
-            memory_utilization_pct=data.get("memoryUtilizationPct"),
-            load_average_1min=data.get("loadAverage1Min"),
-            load_average_5min=data.get("loadAverage5Min"),
-            load_average_15min=data.get("loadAverage15Min"),
-            uplink_rx_rate_bps=uplink.get("rxRateBps"),
-            uplink_tx_rate_bps=uplink.get("txRateBps"),
-            radio_tx_retries_pct={
-                radio_band(radio["frequencyGHz"]): radio.get("txRetriesPct")
-                for radio in radios
-            },
-            last_heartbeat_at=_parse_datetime(data.get("lastHeartbeatAt")),
+    def from_api(
+        cls,
+        data: Mapping[str, Any],
+        on_invalid: InvalidEntryCallback | None = None,
+    ) -> UnifiDeviceStatistics:
+        """Create from a "Latest statistics for a device" object.
+
+        Invalid radios are skipped and reported to ``on_invalid``.
+        """
+        data = _object(data)
+        uplink = _optional(data, "uplink", Mapping) or {}
+        interfaces = _optional(data, "interfaces", Mapping) or {}
+        radios = _parse_entries(
+            _optional(interfaces, "radios", list) or [],
+            _radio_tx_retries,
+            "radio",
+            on_invalid,
         )
+        return cls(
+            uptime_sec=_optional(data, "uptimeSec", int),
+            cpu_utilization_pct=_optional(data, "cpuUtilizationPct", _NUMBER),
+            memory_utilization_pct=_optional(data, "memoryUtilizationPct", _NUMBER),
+            load_average_1min=_optional(data, "loadAverage1Min", _NUMBER),
+            load_average_5min=_optional(data, "loadAverage5Min", _NUMBER),
+            load_average_15min=_optional(data, "loadAverage15Min", _NUMBER),
+            uplink_rx_rate_bps=_optional(uplink, "rxRateBps", int),
+            uplink_tx_rate_bps=_optional(uplink, "txRateBps", int),
+            radio_tx_retries_pct=dict(radios),
+            last_heartbeat_at=_parse_datetime(data, "lastHeartbeatAt"),
+        )
+
+
+def _radio_tx_retries(data: Mapping[str, Any]) -> tuple[str, float | None]:
+    """Read band and TX retries of a "Latest statistics for wireless radio"."""
+    return (
+        radio_band(_required(data, "frequencyGHz", _NUMBER)),
+        _optional(data, "txRetriesPct", _NUMBER),
+    )
 
 
 class UnifiApiClient:
@@ -274,36 +422,97 @@ class UnifiApiClient:
             URL.build(scheme="https", host=host, port=port, path=API_BASE_PATH)
         )
         self._headers = {"X-API-KEY": api_key, "Accept": "application/json"}
+        # Causes of invalid response data that were already logged as warning.
+        self._reported_causes: set[tuple[str, str]] = set()
+
+    def _report_invalid(self, endpoint: str, cause: str) -> None:
+        """Log invalid response data, as warning only once per cause.
+
+        ``endpoint`` is the path template of the specification and ``cause``
+        names the field, so neither contains IDs, names, MAC addresses or the
+        host.
+        """
+        if (endpoint, cause) in self._reported_causes:
+            _LOGGER.debug("Unexpected data from %s: %s", endpoint, cause)
+            return
+        self._reported_causes.add((endpoint, cause))
+        _LOGGER.warning(
+            "Unexpected data from the UniFi Network API (%s): %s. This message is "
+            "logged only once",
+            endpoint,
+            cause,
+        )
+
+    def _parse_object[T](
+        self,
+        endpoint: str,
+        data: Any,
+        parse: Callable[[Mapping[str, Any], InvalidEntryCallback], T],
+    ) -> T:
+        """Parse a single object; invalid entries of its lists are skipped."""
+
+        def on_invalid(cause: str) -> None:
+            self._report_invalid(endpoint, cause)
+
+        try:
+            return parse(_object(data), on_invalid)
+        except _PARSE_ERRORS as err:
+            cause = _describe_parse_error(err)
+            self._report_invalid(endpoint, cause)
+            raise UnifiResponseError(
+                f"Unexpected response from {endpoint}: {cause}"
+            ) from err
+
+    async def _async_get_list[T](
+        self,
+        path: str,
+        endpoint: str,
+        parse: Callable[[Mapping[str, Any]], T],
+        kind: str,
+    ) -> list[T]:
+        """Fetch all pages of a list endpoint and parse every entry.
+
+        Invalid entries are skipped, so a single unexpected object (e.g. a new
+        device type) does not break the whole list.
+        """
+        return _parse_entries(
+            await self._get_all_pages(path, endpoint),
+            parse,
+            kind,
+            lambda cause: self._report_invalid(endpoint, cause),
+        )
 
     async def async_get_application_version(self) -> str:
         """Return the Network application version (``GET /v1/info``)."""
-        data = await self._request("GET", "/v1/info")
-        return data["applicationVersion"]
+        return self._parse_object(
+            "/v1/info",
+            await self._request("GET", "/v1/info"),
+            lambda data, _: _required(data, "applicationVersion", str),
+        )
 
     async def async_get_sites(self) -> list[UnifiSite]:
         """Return all local sites (``GET /v1/sites``)."""
-        return [
-            UnifiSite(
-                id=item["id"],
-                name=item["name"],
-                internal_reference=item["internalReference"],
-            )
-            for item in await self._get_all_pages("/v1/sites")
-        ]
+        return await self._async_get_list(
+            "/v1/sites", "/v1/sites", UnifiSite.from_api, "site"
+        )
 
     async def async_get_devices(self, site_id: str) -> list[UnifiDevice]:
         """Return all adopted devices (``GET /v1/sites/{siteId}/devices``)."""
-        return [
-            UnifiDevice.from_api(item)
-            for item in await self._get_all_pages(f"/v1/sites/{site_id}/devices")
-        ]
+        return await self._async_get_list(
+            f"/v1/sites/{site_id}/devices",
+            "/v1/sites/{siteId}/devices",
+            UnifiDevice.from_api,
+            "device",
+        )
 
     async def async_get_clients(self, site_id: str) -> list[UnifiClient]:
         """Return all connected clients (``GET /v1/sites/{siteId}/clients``)."""
-        return [
-            UnifiClient.from_api(item)
-            for item in await self._get_all_pages(f"/v1/sites/{site_id}/clients")
-        ]
+        return await self._async_get_list(
+            f"/v1/sites/{site_id}/clients",
+            "/v1/sites/{siteId}/clients",
+            UnifiClient.from_api,
+            "client",
+        )
 
     async def async_get_device_statistics(
         self, site_id: str, device_id: str
@@ -312,10 +521,12 @@ class UnifiApiClient:
 
         ``GET /v1/sites/{siteId}/devices/{deviceId}/statistics/latest``
         """
-        return UnifiDeviceStatistics.from_api(
+        return self._parse_object(
+            "/v1/sites/{siteId}/devices/{deviceId}/statistics/latest",
             await self._request(
                 "GET", f"/v1/sites/{site_id}/devices/{device_id}/statistics/latest"
-            )
+            ),
+            UnifiDeviceStatistics.from_api,
         )
 
     async def async_restart_device(self, site_id: str, device_id: str) -> None:
@@ -338,8 +549,10 @@ class UnifiApiClient:
 
         ``GET /v1/sites/{siteId}/devices/{deviceId}`` ("Adopted device details").
         """
-        return UnifiDeviceDetails.from_api(
-            await self._request("GET", f"/v1/sites/{site_id}/devices/{device_id}")
+        return self._parse_object(
+            "/v1/sites/{siteId}/devices/{deviceId}",
+            await self._request("GET", f"/v1/sites/{site_id}/devices/{device_id}"),
+            UnifiDeviceDetails.from_api,
         )
 
     async def async_power_cycle_port(
@@ -359,17 +572,29 @@ class UnifiApiClient:
             expect_body=False,
         )
 
-    async def _get_all_pages(self, path: str) -> list[dict[str, Any]]:
-        """Fetch every page of a paginated list endpoint (offset/limit)."""
-        items: list[dict[str, Any]] = []
+    async def _get_all_pages(self, path: str, endpoint: str) -> list[Any]:
+        """Fetch every page of a paginated list endpoint (offset/limit).
+
+        Returns the raw entries; ``endpoint`` is the path template for messages.
+        """
+        items: list[Any] = []
         offset = 0
         while True:
             page = await self._request(
                 "GET", path, params={"offset": offset, "limit": PAGE_LIMIT}
             )
-            items.extend(page["data"])
-            offset += page["count"]
-            if page["count"] == 0 or offset >= page["totalCount"]:
+            data, count, total_count = self._parse_object(
+                endpoint,
+                page,
+                lambda page, _: (
+                    _required(page, "data", list),
+                    _required(page, "count", int),
+                    _required(page, "totalCount", int),
+                ),
+            )
+            items.extend(data)
+            offset += count
+            if count == 0 or offset >= total_count:
                 return items
 
     async def _request(
@@ -406,7 +631,14 @@ class UnifiApiClient:
                     )
                 if response.status == 204 or not expect_body:
                     return None
-                return await response.json()
+                try:
+                    return await response.json()
+                except (aiohttp.ContentTypeError, ValueError) as err:
+                    # Reachable, but no JSON (e.g. an HTML page or a cut-off body).
+                    # The body is not logged, it could contain personal data.
+                    raise UnifiResponseError(
+                        f"{method} {path}: the response is not valid JSON"
+                    ) from err
         except (TimeoutError, aiohttp.ClientError) as err:
             # Headers (API key) are never logged.
             _LOGGER.debug("Error requesting %s %s: %s", method, path, err)

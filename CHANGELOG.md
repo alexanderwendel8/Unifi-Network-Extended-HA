@@ -1,5 +1,8 @@
 # Changelog
 
+Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuerst unter
+„Unreleased“; beim nächsten Release wird dieser Abschnitt zur Versionsnummer.
+
 ## Unreleased
 
 ### Einrichtung
@@ -10,6 +13,62 @@
 - Ein Port in der Host-Eingabe (`unifi.local:8443`, `[fd00::1]:8443`) wird ins Feld Port übernommen
 - Ungültige Hosts werden mit dem Fehler „Ungültiger Host“ abgelehnt, statt eine Verbindung zu versuchen
 - Beim Neu konfigurieren bleiben die Eingaben nach einem Fehler im Formular erhalten
+
+### Dokumentation
+- Changelog: Abschnitt „Unreleased“ für laufende Änderungen; Release-Ablauf entsprechend angepasst
+- README: „Getestete Geräte“ nennt Version 0.1.1 und die UniFi-Network-Anwendung 11.0.104
+
+### Entwicklung
+- GitHub Actions auf Commit-SHA mit Versionskommentar festgelegt und aktualisiert (Node.js 24):
+  `actions/checkout` v7.0.1, `actions/setup-python` v7.1.0, `softprops/action-gh-release` v3.0.4,
+  `home-assistant/actions/hassfest` 2026.11.0, `hacs/action` 22.5.0
+- Dependabot schlägt Updates der GitHub Actions wöchentlich als Pull Request vor
+
+## 0.1.1
+
+Wartungsrelease: robustere Verarbeitung der API-Daten, aktuelles Geräteregister und die
+Version der UniFi-Network-Anwendung als Sensor.
+
+### Neu
+- **Standort:** Diagnose-Sensor *UniFi-Network-Version* mit der Version der
+  UniFi-Network-Anwendung (`GET /v1/info`); dieselbe Version steht als Firmware-Version am
+  Standort-Gerät und in den Diagnosedaten. Abfrage beim Start und danach stündlich; ein Fehler
+  dabei verhindert den Start nicht, ein ungültiger API-Schlüssel startet die erneute Anmeldung.
+
+### Behoben
+- Firmware-Version und Name der UniFi-Geräte werden im Geräteregister von Home Assistant bei jedem
+  Abruf aktualisiert, ohne die Integration neu zu laden. Ein in Home Assistant vergebener Name
+  bleibt erhalten.
+- Ein einzelner unerwartet aufgebauter Datensatz der UniFi-API (fehlendes Pflichtfeld oder
+  unerwarteter Typ, z. B. nach einem Firmware-Update oder bei einem neuen Gerätetyp) macht
+  nicht mehr alle Entitäten unverfügbar: Betroffene Standorte, Geräte, Clients, Ports und
+  Funkbänder werden übersprungen, alle übrigen funktionieren weiter.
+- Sind Statistik oder Details eines Geräts nicht auslesbar, betrifft das nur dieses Gerät.
+- Ungültiges JSON (z. B. eine HTML-Seite statt einer API-Antwort) wird als unerwartete Antwort
+  gemeldet, nicht mehr als „nicht erreichbar“.
+- Übersprungene Daten werden je Ursache einmal als Warnung protokolliert, mit Endpunkt und
+  Feldname, aber ohne API-Schlüssel, Host, Namen, MAC-Adressen oder IDs.
+
+### Dokumentation
+- README: Einleitung überarbeitet; neue Rubrik „Getestete Geräte“ (Home Assistant 2026.11.2,
+  Geräte mit Firmware-Version, was am echten Netz geprüft ist und was nicht) (#14)
+- README: Installation über den Marketplace (ab Home Assistant 2026.11), über HACS (bis 2026.10)
+  und automatische Übernahme bestehender HACS-Installationen (#15)
+- Entwicklungsregeln (`CLAUDE.md`): Fragen zu Home Assistant werden mit der offiziellen
+  Home-Assistant-Dokumentation beantwortet (#16)
+
+### Sonstiges
+- Mindestversion Home Assistant 2025.3.0 (wie bisher in `hacs.json`) geprüft und in der README genannt;
+  die CI testet jetzt 2025.3.0, 2026.2.3 und die aktuelle Version mit festgelegten Versionen von
+  `pytest-homeassistant-custom-component` (aktuelle Version per Dependabot aktualisiert)
+
+### Entwicklung
+- Testabdeckung wird in der CI gemessen (Zeilen und Zweige), im Log und in der Zusammenfassung
+  des Actions-Laufs angezeigt; der Lauf schlägt unter 97 % fehl
+- Neue Tests für Fehlerpfade: Fehlertext aus der API-Antwort, ungültiger API-Schlüssel und
+  unerwartete Fehler beim Abruf je Gerät, alle Standorte bereits eingerichtet, unbekanntes
+  Uplink-Gerät, Funkbänder werden nur einmal angelegt (Abdeckung 97,1 % → 98,0 % auf allen drei
+  getesteten Home-Assistant-Versionen)
 
 ## 0.1.0
 
@@ -40,3 +99,5 @@ Erstes Release der Home-Assistant-Integration für UniFi Network über die offiz
 - Diagnose-Export mit geschwärztem API-Schlüssel und Host
 - Texte auf Deutsch und Englisch
 - GitHub Actions: Tests (pytest, ruff) sowie hassfest- und HACS-Prüfung
+- Kategorien im Manifest (`computers_network.routers_network`, `presence_location.network_presence`),
+  damit die HACS-Prüfung nicht mehr warnt
