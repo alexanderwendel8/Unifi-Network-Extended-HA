@@ -9,6 +9,9 @@
   dabei verhindert den Start nicht, ein ungültiger API-Schlüssel startet die erneute Anmeldung.
 
 ### Behoben
+- Firmware-Version und Name der UniFi-Geräte werden im Geräteregister von Home Assistant bei jedem
+  Abruf aktualisiert, ohne die Integration neu zu laden. Ein in Home Assistant vergebener Name
+  bleibt erhalten.
 - Ein einzelner unerwartet aufgebauter Datensatz der UniFi-API (fehlendes Pflichtfeld oder
   unerwarteter Typ, z. B. nach einem Firmware-Update oder bei einem neuen Gerätetyp) macht
   nicht mehr alle Entitäten unverfügbar: Betroffene Standorte, Geräte, Clients, Ports und

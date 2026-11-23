@@ -110,6 +110,57 @@ async def test_device_registry(
     assert (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:00:00:01") in gateway.connections
 
 
+async def test_device_registry_follows_unifi(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Firmware and name changes reach the registry, name_by_user is kept."""
+    await _setup(hass, config_entry)
+    registry = dr.async_get(hass)
+    gateway = _get_device(hass, config_entry, GATEWAY.id)
+    access_point = _get_device(hass, config_entry, ACCESS_POINT.id)
+    registry.async_update_device(access_point.id, name_by_user="Flur")
+
+    updates: list[str] = []
+    hass.bus.async_listen(
+        dr.EVENT_DEVICE_REGISTRY_UPDATED,
+        lambda event: updates.append(event.data["device_id"]),
+    )
+
+    async def refresh() -> None:
+        freezer.tick(timedelta(seconds=DEFAULT_SCAN_INTERVAL))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    # Unchanged data: nothing is written.
+    await refresh()
+    assert updates == []
+
+    mock_api["devices"].return_value = [
+        replace(GATEWAY, name="Router"),
+        replace(ACCESS_POINT, name="AP Flur", firmware_version="8.9.0"),
+    ]
+    await refresh()
+
+    gateway = _get_device(hass, config_entry, GATEWAY.id)
+    assert gateway.name == "Router"
+    assert gateway.sw_version == GATEWAY.firmware_version
+    access_point = _get_device(hass, config_entry, ACCESS_POINT.id)
+    assert access_point.name == "AP Flur"
+    assert access_point.name_by_user == "Flur"
+    assert access_point.sw_version == "8.9.0"
+    site = _get_device(hass, config_entry, SITE.id)
+    assert site.name == SITE.name
+    assert sorted(updates) == sorted([gateway.id, access_point.id])
+
+    # Same data again: no further writes.
+    updates.clear()
+    await refresh()
+    assert updates == []
+
+
 def _register_known_devices(
     hass: HomeAssistant, entry: MockConfigEntry, *macs: str
 ) -> None:
