@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Keeps the "current" Home Assistant version of the test matrix up to date
+  # (pytest-homeassistant-custom-component in requirements_test.txt).
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
