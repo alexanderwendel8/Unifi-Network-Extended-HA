@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Geändert
+- Device-Tracker von Clients, die 180 Tage nicht verbunden waren, werden automatisch entfernt,
+  auch eingeschaltete (Prüfung beim Start und täglich). Ein nur für den Tracker angelegtes Gerät
+  wird mit entfernt, Geräte anderer Integrationen bleiben erhalten. Der Zeitpunkt der letzten
+  Verbindung wird pro Konfigurationseintrag gespeichert; bestehende Tracker starten ihre Frist
+  mit dem ersten Start nach dem Update. Kommt der Client wieder, entsteht wieder ein Tracker.
+- Beim Ausschalten von „Clients verfolgen“ werden auch die gespeicherten Verbindungszeiten
+  gelöscht, beim Entfernen der Integration ihre Speicherdatei.
+
 ### Entitäten
 - Geräte, die UniFi nicht mehr meldet, werden nach dem nächsten erfolgreichen Abruf samt Entitäten
   automatisch aus Home Assistant entfernt (auch beim Start); solche Geräte lassen sich zudem in der

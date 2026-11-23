@@ -193,6 +193,29 @@ bekommt es wieder neue Entitäten.
   MAC-Adresse bekannt ist). Gewünschte Tracker lassen sich einzeln einschalten;
   sie werden dann dem Gerät mit dieser MAC-Adresse zugeordnet, z. B. dem
   Smartphone aus der Companion-App, sonst entsteht ein eigenes Gerät.
+- Tracker von Clients, die **180 Tage** nicht verbunden waren, entfernt die
+  Integration automatisch, auch eingeschaltete. Geprüft wird beim Start und
+  danach einmal täglich. Ein Gerät, das nur für den Tracker angelegt wurde,
+  verschwindet mit; Geräte anderer Integrationen (z. B. das Smartphone aus der
+  Companion-App) bleiben erhalten. So wächst das Entitätenregister nicht durch
+  Gäste oder wechselnde private WLAN-Adressen von Smartphones.
+- Die API liefert nur verbundene Clients. Den Zeitpunkt der letzten Verbindung
+  speichert die Integration daher selbst (in `.storage/`, wird beim Entfernen
+  der Integration gelöscht). Für Tracker, die vor dem Update schon da waren,
+  beginnt die Frist mit dem ersten Start.
+- Taucht der Client später wieder auf, entsteht wieder ein Tracker. Er ist wie
+  gewohnt deaktiviert, bis man ihn einschaltet. Ausnahme: Home Assistant merkt
+  sich die Einstellungen entfernter Entitäten (Entitäts-ID, Name, Bereich,
+  ein-/ausgeschaltet) und stellt sie wieder her; ein vorher eingeschalteter
+  Tracker kommt also eingeschaltet und mit derselben Entitäts-ID zurück
+  (Quelle: [`entity_registry.py`](https://github.com/home-assistant/core/blob/2026.11.2/homeassistant/helpers/entity_registry.py),
+  `async_get_or_create`).
+- **Hinweis für Automationen:** Zwischen dem Entfernen und dem Wiederauftauchen
+  gibt es die Entität nicht. Automationen und Skripte, die einen solchen
+  Tracker verwenden, lösen dann nicht aus bzw. ihre Bedingungen sind nicht
+  erfüllt. Für Anwesenheitserkennung eignen sich deshalb nur Geräte, die
+  regelmäßig verbunden sind und eine feste MAC-Adresse verwenden (bei
+  Smartphones die private WLAN-Adresse für das Heimnetz ausschalten).
 
 ## Symbole
 
@@ -211,7 +234,7 @@ regelmäßig ab. Unter *⋮ → Optionen* einstellbar:
 |---|---|---|
 | Abrufintervall Geräte und Clients | 30 s | min. 10 s |
 | Abrufintervall Gerätestatistik und Gerätedetails | 60 s | min. 30 s; je zwei Anfragen pro Gerät (Statistik, Details mit Ports und Uplink) |
-| Clients verfolgen | an | beim Ausschalten werden die Tracker entfernt |
+| Clients verfolgen | an | Tracker von Clients, die 180 Tage nicht verbunden waren, werden automatisch entfernt (auch eingeschaltete; kommt der Client wieder, entsteht ein neuer Tracker); beim Ausschalten werden alle Tracker und die gespeicherten Verbindungszeiten entfernt |
 
 Die Version der UniFi-Network-Anwendung wird unabhängig davon beim Start und
 danach stündlich abgefragt. Schlägt die Abfrage fehl, startet die Integration

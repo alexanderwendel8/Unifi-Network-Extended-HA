@@ -7,21 +7,35 @@ considered away.
 As usual for router based trackers, Home Assistant creates trackers disabled
 (up to 2026.x only when no device with the same MAC address is known yet);
 they can be enabled individually.
+
+Trackers of clients that have not been connected for CLIENT_TRACKER_RETENTION
+are removed (see client_history.py).
 """
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from homeassistant.components.device_tracker import ScannerEntity, SourceType
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from . import UnifiNetworkExtendedConfigEntry
 from .api import UnifiClient
-from .const import CONF_TRACK_CLIENTS, DEFAULT_TRACK_CLIENTS
+from .client_history import ClientHistory
+from .const import (
+    CLIENT_TRACKER_CLEANUP_INTERVAL,
+    CLIENT_TRACKER_RETENTION,
+    CONF_TRACK_CLIENTS,
+    DEFAULT_TRACK_CLIENTS,
+    DOMAIN,
+)
 from .coordinator import UnifiSiteCoordinator
 
 PARALLEL_UPDATES = 0
@@ -41,21 +55,63 @@ async def async_setup_entry(
         for reg_entry in er.async_entries_for_config_entry(registry, entry.entry_id)
         if reg_entry.domain == Platform.DEVICE_TRACKER
     ]
+    history = ClientHistory(hass, entry.entry_id)
 
     if not entry.options.get(CONF_TRACK_CLIENTS, DEFAULT_TRACK_CLIENTS):
-        # Tracking was switched off: remove the previously created trackers.
+        # Tracking was switched off: remove the previously created trackers
+        # and the remembered connection times.
         for reg_entry in tracker_entries:
-            registry.async_remove(reg_entry.entity_id)
+            _async_remove_tracker(hass, entry, reg_entry.entity_id)
+        await history.async_remove()
         return
+
+    await history.async_load()
+    entry.async_on_unload(history.async_flush)
 
     coordinator = entry.runtime_data.site_coordinator
     site_id = coordinator.site.id
     known: set[str] = set()
 
+    @callback
+    def _async_mark_connected_seen() -> None:
+        history.async_mark_seen(
+            (
+                mac
+                for mac, client in coordinator.data.clients_by_mac.items()
+                if client.type in TRACKED_CLIENT_TYPES
+            ),
+            dt_util.utcnow(),
+        )
+
+    @callback
+    def _async_remove_stale_trackers(_now: datetime | None = None) -> None:
+        """Remove trackers of clients not connected within the retention."""
+        connected = coordinator.data.clients_by_mac
+        for mac in history.async_stale(dt_util.utcnow() - CLIENT_TRACKER_RETENTION):
+            if mac in connected:
+                continue
+            if entity_id := registry.async_get_entity_id(
+                Platform.DEVICE_TRACKER, DOMAIN, f"{site_id}_{mac}"
+            ):
+                _async_remove_tracker(hass, entry, entity_id)
+            history.async_forget(mac)
+            # A client showing up again gets a new tracker.
+            known.discard(mac)
+
+    # Trackers created before the history existed start their retention now.
+    macs = {
+        reg_entry.unique_id.removeprefix(f"{site_id}_") for reg_entry in tracker_entries
+    }
+    history.async_add_missing(macs, dt_util.utcnow())
+    _async_mark_connected_seen()
+    _async_remove_stale_trackers()
+
     # Restore trackers of clients that are currently not connected.
     restored: list[UnifiClientTracker] = []
     for reg_entry in tracker_entries:
         mac = reg_entry.unique_id.removeprefix(f"{site_id}_")
+        if registry.async_get(reg_entry.entity_id) is None:
+            continue  # removed as stale
         known.add(mac)
         restored.append(
             UnifiClientTracker(coordinator, mac, reg_entry.original_name or mac.upper())
@@ -77,8 +133,75 @@ async def async_setup_entry(
             for mac, client in new_clients.items()
         )
 
+    @callback
+    def _async_coordinator_updated() -> None:
+        if coordinator.last_update_success:
+            _async_mark_connected_seen()
+        _async_add_new_clients()
+
     _async_add_new_clients()
-    entry.async_on_unload(coordinator.async_add_listener(_async_add_new_clients))
+    entry.async_on_unload(coordinator.async_add_listener(_async_coordinator_updated))
+    entry.async_on_unload(
+        async_track_time_interval(
+            hass, _async_remove_stale_trackers, CLIENT_TRACKER_CLEANUP_INTERVAL
+        )
+    )
+
+
+@callback
+def _async_remove_tracker(
+    hass: HomeAssistant, entry: UnifiNetworkExtendedConfigEntry, entity_id: str
+) -> None:
+    """Remove a tracker and the device only it created."""
+    entity_registry = er.async_get(hass)
+    if (reg_entry := entity_registry.async_get(entity_id)) is None:
+        return
+    device_id = reg_entry.device_id
+    entity_registry.async_remove(entity_id)
+    if device_id is not None:
+        _async_release_device(hass, entry, device_id)
+
+
+@callback
+def _async_release_device(
+    hass: HomeAssistant, entry: UnifiNetworkExtendedConfigEntry, device_id: str
+) -> None:
+    """Release the device of a removed tracker from this config entry.
+
+    Trackers describe their client by MAC address only. Home Assistant creates a
+    device for them, or (before 2026.10) adds this config entry to the device of
+    another integration with the same MAC address, e.g. the phone from the
+    companion app. Such devices are kept, only this config entry is removed.
+    """
+    device_registry = dr.async_get(hass)
+    if (device := device_registry.async_get(device_id)) is None:
+        return
+    # Since Home Assistant 2026.10 a device belongs to a single config entry.
+    if (owner := getattr(device, "config_entry_id", None)) is not None:
+        owners = {owner}
+    else:
+        owners = set(device.config_entries)
+    if (
+        entry.entry_id not in owners
+        # UniFi devices and the site are described by identifiers.
+        or any(domain == DOMAIN for domain, _ in device.identifiers)
+        or any(
+            conn_type != CONNECTION_NETWORK_MAC for conn_type, _ in device.connections
+        )
+        or any(
+            other.config_entry_id == entry.entry_id
+            for other in er.async_entries_for_device(
+                er.async_get(hass), device_id, include_disabled_entities=True
+            )
+        )
+    ):
+        return
+    if owners == {entry.entry_id}:
+        device_registry.async_remove_device(device_id)
+    else:
+        device_registry.async_update_device(
+            device_id, remove_config_entry_id=entry.entry_id
+        )
 
 
 class UnifiClientTracker(CoordinatorEntity[UnifiSiteCoordinator], ScannerEntity):
