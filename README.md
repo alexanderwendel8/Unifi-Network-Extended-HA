@@ -24,7 +24,7 @@ Spezifikation liegt unter
 Einrichtung und Konfiguration erfolgen vollständig über die Oberfläche von
 Home Assistant.
 
-> **Status:** Version 0.1.0 – an einem echten UniFi-Netz getestet
+> **Status:** Version 0.1.1 – an einem echten UniFi-Netz getestet
 > (siehe [Getestete Geräte](#getestete-geräte)).
 
 ## Getestete Geräte
@@ -34,9 +34,9 @@ Getestet an einem echten UniFi-Netz mit folgender Umgebung und folgenden Geräte
 | Umgebung | Version |
 |---|---|
 | Home Assistant | 2026.11.2 (Home Assistant OS 18.4) |
-| UniFi Network Extended | 0.1.0 |
+| UniFi Network Extended | 0.1.1 |
 | UniFi Network API (Spezifikation) | 10.3.58 |
-| UniFi-Network-Anwendung (Sensor *UniFi-Network-Version*) | _noch eintragen_ |
+| UniFi-Network-Anwendung (Sensor *UniFi-Network-Version*) | 11.0.104 |
 
 | Gerät | Typ | Firmware |
 |---|---|---|
@@ -258,7 +258,8 @@ Zusammenfassung des Actions-Laufs und schlägt fehl, wenn sie unter 97 % fällt
 
 ## Releases
 
-Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md). Releases erstellt der Workflow `release.yml`
+Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md); was noch in keinem Release ist, steht dort
+unter „Unreleased“. Releases erstellt der Workflow `release.yml`
 mit den Notizen aus dem Changelog – entweder per Tag `vX.Y.Z` oder manuell unter
 *Actions → Release → Run workflow* (auf `main`, Eingabe z. B. `0.1.0`; der Tag wird dann gesetzt).
 Die Version muss zu `manifest.json` passen. Marketplace bzw. HACS zeigen dann die Versionsnummer

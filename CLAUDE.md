@@ -16,6 +16,9 @@
   testet die Mindestversion aus `hacs.json` (2025.3.0), 2026.2.3 (letzte Version für
   Python 3.13) und die aktuelle Version; die Mindestversion in `hacs.json`, README und
   Workflow gemeinsam ändern.
+- Jede Änderung (Code, Doku, Workflows) bekommt einen Eintrag unter `## Unreleased` in
+  `CHANGELOG.md`, auf Deutsch und in der passenden Unterrubrik. Gibt es den Abschnitt nicht,
+  wird er direkt unter der Einleitung angelegt.
 - Releases: Ablauf und wiederverwendbare Vorlage in `.claude/skills/release/SKILL.md`
   (Version in `manifest.json` + Abschnitt in `CHANGELOG.md`, dann Workflow `release.yml` manuell auf `main` starten).
 

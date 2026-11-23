@@ -1,5 +1,14 @@
 # Changelog
 
+Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuerst unter
+„Unreleased“; beim nächsten Release wird dieser Abschnitt zur Versionsnummer.
+
+## Unreleased
+
+### Dokumentation
+- Changelog: Abschnitt „Unreleased“ für laufende Änderungen; Release-Ablauf entsprechend angepasst
+- README: „Getestete Geräte“ nennt Version 0.1.1 und die UniFi-Network-Anwendung 11.0.104
+
 ## 0.1.1
 
 Wartungsrelease: robustere Verarbeitung der API-Daten, aktuelles Geräteregister und die
@@ -24,6 +33,14 @@ Version der UniFi-Network-Anwendung als Sensor.
   gemeldet, nicht mehr als „nicht erreichbar“.
 - Übersprungene Daten werden je Ursache einmal als Warnung protokolliert, mit Endpunkt und
   Feldname, aber ohne API-Schlüssel, Host, Namen, MAC-Adressen oder IDs.
+
+### Dokumentation
+- README: Einleitung überarbeitet; neue Rubrik „Getestete Geräte“ (Home Assistant 2026.11.2,
+  Geräte mit Firmware-Version, was am echten Netz geprüft ist und was nicht) (#14)
+- README: Installation über den Marketplace (ab Home Assistant 2026.11), über HACS (bis 2026.10)
+  und automatische Übernahme bestehender HACS-Installationen (#15)
+- Entwicklungsregeln (`CLAUDE.md`): Fragen zu Home Assistant werden mit der offiziellen
+  Home-Assistant-Dokumentation beantwortet (#16)
 
 ### Sonstiges
 - Mindestversion Home Assistant 2025.3.0 (wie bisher in `hacs.json`) geprüft und in der README genannt;
@@ -67,3 +84,5 @@ Erstes Release der Home-Assistant-Integration für UniFi Network über die offiz
 - Diagnose-Export mit geschwärztem API-Schlüssel und Host
 - Texte auf Deutsch und Englisch
 - GitHub Actions: Tests (pytest, ruff) sowie hassfest- und HACS-Prüfung
+- Kategorien im Manifest (`computers_network.routers_network`, `presence_location.network_presence`),
+  damit die HACS-Prüfung nicht mehr warnt
