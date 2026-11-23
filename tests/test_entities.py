@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import (
     STATE_HOME,
     STATE_NOT_HOME,
@@ -20,6 +21,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
     mock_restore_cache_with_extra_data,
 )
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.unifi_network_extended.api import UnifiCannotConnect
 from custom_components.unifi_network_extended.const import (
@@ -115,6 +117,57 @@ async def test_device_registry(
     assert gateway.sw_version == "4.1.13"
     assert gateway.via_device_id == site.id
     assert (dr.CONNECTION_NETWORK_MAC, "aa:bb:cc:00:00:01") in gateway.connections
+
+
+async def test_device_registry_follows_unifi(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Firmware and name changes reach the registry, name_by_user is kept."""
+    await _setup(hass, config_entry)
+    registry = dr.async_get(hass)
+    gateway = _get_device(hass, config_entry, GATEWAY.id)
+    access_point = _get_device(hass, config_entry, ACCESS_POINT.id)
+    registry.async_update_device(access_point.id, name_by_user="Flur")
+
+    updates: list[str] = []
+    hass.bus.async_listen(
+        dr.EVENT_DEVICE_REGISTRY_UPDATED,
+        lambda event: updates.append(event.data["device_id"]),
+    )
+
+    async def refresh() -> None:
+        freezer.tick(timedelta(seconds=DEFAULT_SCAN_INTERVAL))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    # Unchanged data: nothing is written.
+    await refresh()
+    assert updates == []
+
+    mock_api["devices"].return_value = [
+        replace(GATEWAY, name="Router"),
+        replace(ACCESS_POINT, name="AP Flur", firmware_version="8.9.0"),
+    ]
+    await refresh()
+
+    gateway = _get_device(hass, config_entry, GATEWAY.id)
+    assert gateway.name == "Router"
+    assert gateway.sw_version == GATEWAY.firmware_version
+    access_point = _get_device(hass, config_entry, ACCESS_POINT.id)
+    assert access_point.name == "AP Flur"
+    assert access_point.name_by_user == "Flur"
+    assert access_point.sw_version == "8.9.0"
+    site = _get_device(hass, config_entry, SITE.id)
+    assert site.name == SITE.name
+    assert sorted(updates) == sorted([gateway.id, access_point.id])
+
+    # Same data again: no further writes.
+    updates.clear()
+    await refresh()
+    assert updates == []
 
 
 def _register_known_devices(
@@ -429,7 +482,9 @@ async def test_last_restart_is_restored(
                 State(entity_id, restored.isoformat()),
                 {
                     "native_value": {
-                        "__type": str(datetime),
+                        # Stored type name as written by Home Assistant; not
+                        # str(datetime), freezegun may replace datetime there.
+                        "__type": "<class 'datetime.datetime'>",
                         "isoformat": restored.isoformat(),
                     },
                     "native_unit_of_measurement": None,
@@ -504,3 +559,128 @@ async def test_radio_entities_are_added_once(
     )
     assert "does not generate unique IDs" not in caplog.text
     assert hass.states.get("sensor.access_point_5_ghz_channel").state == "36"
+
+
+API_INFO = "https://192.168.1.1/proxy/network/integration/v1/info"
+API_SITES = "https://192.168.1.1/proxy/network/integration/v1/sites"
+API_BASE = f"{API_SITES}/{SITE.id}"
+# Personal data of invalid entries; it must never appear in the log.
+SECRET_CLIENT_NAME = "Annas iPhone"
+SECRET_MAC = "de:ad:be:ef:00:01"
+
+
+def _api_page(entries: list) -> dict:
+    count = len(entries)
+    return {
+        "data": entries,
+        "offset": 0,
+        "limit": 200,
+        "count": count,
+        "totalCount": count,
+    }
+
+
+def _api_device(device_id: str, name: str, mac: str) -> dict:
+    return {
+        "id": device_id,
+        "name": name,
+        "model": "U7 Pro",
+        "macAddress": mac,
+        "ipAddress": "192.168.1.5",
+        "state": "ONLINE",
+        "firmwareVersion": "8.0.0",
+        "firmwareUpdatable": False,
+        "features": [],
+        "interfaces": ["ports"],
+        "supported": True,
+    }
+
+
+async def test_invalid_api_data_only_affects_the_invalid_entries(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Invalid devices, clients, statistics and details do not break the rest.
+
+    Uses the real API client, so the responses are parsed as in production.
+    """
+    broken_device = _api_device("dev-new", "New device", SECRET_MAC)
+    del broken_device["state"]
+    port = {"idx": 1, "state": "UP", "connector": "RJ45", "maxSpeedMbps": 2500}
+    # Network application version (GET /v1/info), queried since the version sensor.
+    aioclient_mock.get(API_INFO, json={"applicationVersion": "10.3.58"})
+    aioclient_mock.get(
+        f"{API_SITES}?offset=0&limit=200",
+        json=_api_page(
+            [
+                {"id": "broken"},
+                {"id": SITE.id, "name": SITE.name, "internalReference": "default"},
+            ]
+        ),
+    )
+    aioclient_mock.get(
+        f"{API_BASE}/devices?offset=0&limit=200",
+        json=_api_page(
+            [
+                _api_device(GATEWAY.id, "Gateway", "aa:bb:cc:00:00:01"),
+                broken_device,
+                _api_device(ACCESS_POINT.id, "Access Point", "aa:bb:cc:00:00:02"),
+            ]
+        ),
+    )
+    aioclient_mock.get(
+        f"{API_BASE}/clients?offset=0&limit=200",
+        json=_api_page(
+            [
+                {"id": "c1", "name": "NAS", "type": "WIRED", "access": {}},
+                # A client type this version does not know yet, without type.
+                {"id": "c2", "name": SECRET_CLIENT_NAME, "macAddress": SECRET_MAC},
+            ]
+        ),
+    )
+    aioclient_mock.get(
+        f"{API_BASE}/devices/{GATEWAY.id}/statistics/latest",
+        json={"cpuUtilizationPct": 12.5, "interfaces": {}},
+    )
+    aioclient_mock.get(
+        f"{API_BASE}/devices/{ACCESS_POINT.id}/statistics/latest", text="<html>"
+    )
+    aioclient_mock.get(
+        f"{API_BASE}/devices/{GATEWAY.id}",
+        json={"interfaces": {"ports": [port, {**port, "idx": "2"}]}},
+    )
+    aioclient_mock.get(
+        f"{API_BASE}/devices/{ACCESS_POINT.id}", json={"interfaces": ["ports"]}
+    )
+
+    await _setup(hass, config_entry)
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    # The invalid device and client are skipped, the others are available.
+    assert _state(hass, f"{SITE.id}_devices") == "2"
+    assert _state(hass, f"{SITE.id}_clients") == "1"
+    assert _state(hass, "dev-gw_state") == "online"
+    assert _state(hass, "dev-ap_state") == "online"
+    assert _get_device(hass, config_entry, "dev-new") is None
+    # Statistics and details of the access point cannot be read: only its
+    # entities are affected.
+    assert _state(hass, "dev-gw_cpu_utilization") == "12.5"
+    assert _state(hass, "dev-ap_cpu_utilization") == STATE_UNAVAILABLE
+    assert _state(hass, "dev-gw_port1_link", "binary_sensor") == STATE_ON
+    assert not er.async_get(hass).async_get_entity_id(
+        "binary_sensor", DOMAIN, "dev-gw_port2_link"
+    )
+    assert "Unexpected error" not in caplog.text
+
+    warnings = [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    assert any("site skipped: field 'name' is missing" in w for w in warnings)
+    assert any("device skipped: field 'state' is missing" in w for w in warnings)
+    assert any("client skipped: field 'type' is missing" in w for w in warnings)
+    assert any(
+        "port skipped: field 'idx' has an unexpected type" in w for w in warnings
+    )
+    assert any("{siteId}/devices/{deviceId}" in w for w in warnings)
+    for text in (SECRET_CLIENT_NAME, SECRET_MAC, "192.168.1.1", "secret-key"):
+        assert text not in caplog.text

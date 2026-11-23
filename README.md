@@ -36,6 +36,7 @@ Getestet an einem echten UniFi-Netz mit folgender Umgebung und folgenden Geräte
 | Home Assistant | 2026.11.2 (Home Assistant OS 18.4) |
 | UniFi Network Extended | 0.1.0 |
 | UniFi Network API (Spezifikation) | 10.3.58 |
+| UniFi-Network-Anwendung (Sensor *UniFi-Network-Version*) | _noch eintragen_ |
 
 | Gerät | Typ | Firmware |
 |---|---|---|
@@ -63,6 +64,11 @@ Weitere Rückmeldungen zu Geräten gern als
 [Issue](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/issues).
 
 ## Installation
+
+**Voraussetzung:** Home Assistant **2025.3.0** oder neuer (wie in
+[`hacs.json`](hacs.json) angegeben). Die automatischen Tests laufen gegen diese
+Mindestversion, gegen 2026.2 (letzte Version für Python 3.13) und gegen die
+aktuelle Version.
 
 Die Integration ist (noch) nicht im offiziellen Katalog enthalten und wird als
 **benutzerdefiniertes Repository** hinzugefügt.
@@ -134,6 +140,9 @@ Home Assistant automatisch einen neuen an.
 - Verbundene Clients gesamt, kabelgebunden und WLAN
 - VPN- und Gast-Clients (standardmäßig deaktiviert)
 - Anzahl adoptierter Geräte
+- UniFi-Network-Version (Diagnose): Version der UniFi-Network-Anwendung, zugleich
+  als Firmware-Version des Standort-Geräts angezeigt; wird stündlich geprüft
+  (`GET /v1/info`)
 
 **Pro UniFi-Gerät** (Gateway, Switch, Access Point …)
 - Status (Online, Offline, Wird aktualisiert, …)
@@ -194,6 +203,11 @@ regelmäßig ab. Unter *⋮ → Optionen* einstellbar:
 | Abrufintervall Geräte und Clients | 30 s | min. 10 s |
 | Abrufintervall Gerätestatistik und Gerätedetails | 60 s | min. 30 s; je zwei Anfragen pro Gerät (Statistik, Details mit Ports und Uplink) |
 | Clients verfolgen | an | beim Ausschalten werden die Tracker entfernt |
+
+Die Version der UniFi-Network-Anwendung wird unabhängig davon beim Start und
+danach stündlich abgefragt. Schlägt die Abfrage fehl, startet die Integration
+trotzdem; der Sensor ist dann bis zur nächsten erfolgreichen Abfrage nicht
+verfügbar, die am Standort-Gerät gespeicherte Version bleibt erhalten.
 
 ## Speicherung des API-Schlüssels
 
