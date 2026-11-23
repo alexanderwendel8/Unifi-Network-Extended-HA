@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Final
 
 DOMAIN: Final = "unifi_network_extended"
@@ -21,3 +22,8 @@ DEFAULT_TRACK_CLIENTS: Final = True
 
 # Limit parallel statistics requests (one request per device).
 STATISTICS_PARALLEL_REQUESTS: Final = 4
+
+# Trackers of clients not connected for this long are removed. The API only
+# lists connected clients, the integration remembers the last connection.
+CLIENT_TRACKER_RETENTION: Final = timedelta(days=180)
+CLIENT_TRACKER_CLEANUP_INTERVAL: Final = timedelta(days=1)

@@ -22,6 +22,7 @@ from .api import (
     UnifiSite,
     async_create_api_client,
 )
+from .client_history import async_remove_client_history
 from .const import (
     CONF_SITE_ID,
     CONF_STATISTICS_INTERVAL,
@@ -162,3 +163,10 @@ async def async_unload_entry(
 ) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(
+    hass: HomeAssistant, entry: UnifiNetworkExtendedConfigEntry
+) -> None:
+    """Delete stored data when the config entry is removed."""
+    await async_remove_client_history(hass, entry.entry_id)
