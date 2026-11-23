@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Entitäten
+- Geräte, die UniFi nicht mehr meldet, werden nach dem nächsten erfolgreichen Abruf samt Entitäten
+  automatisch aus Home Assistant entfernt (auch beim Start); solche Geräte lassen sich zudem in der
+  Oberfläche von Hand löschen. Offline-Geräte, Geräte mit ungültigen API-Daten (siehe 0.1.1) und das
+  Standort-Gerät bleiben erhalten, ein erneut adoptiertes Gerät bekommt wieder Entitäten.
+
 ### Einrichtung
 - Host als Hostname, IPv4- oder IPv6-Adresse; IPv6-Adressen werden in der URL korrekt in
   eckige Klammern gesetzt (z. B. `https://[fd00::1]:443/...`)

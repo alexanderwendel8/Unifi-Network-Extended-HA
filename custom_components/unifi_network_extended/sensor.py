@@ -421,6 +421,8 @@ async def async_setup_entry(
 
     @callback
     def _async_add_new_devices() -> None:
+        # Forget removed devices, so they get new entities if they come back.
+        known.intersection_update(site_coordinator.data.devices)
         new_ids = set(site_coordinator.data.devices) - known
         if not new_ids:
             return

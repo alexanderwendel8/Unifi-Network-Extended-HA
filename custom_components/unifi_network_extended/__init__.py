@@ -245,3 +245,24 @@ async def async_unload_entry(
 ) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant,
+    entry: UnifiNetworkExtendedConfigEntry,
+    device_entry: dr.DeviceEntry,
+) -> bool:
+    """Allow deleting a UniFi device in the UI once UniFi no longer reports it.
+
+    The site device and devices still reported by UniFi (online or offline) can't
+    be deleted. Devices without an identifier of this integration (e.g. clients
+    created by device trackers) are not managed here and can't be deleted either.
+    """
+    unifi_ids = {
+        identifier[1]
+        for identifier in device_entry.identifiers
+        if identifier[0] == DOMAIN
+    }
+    if not unifi_ids or entry.runtime_data.site.id in unifi_ids:
+        return False
+    return not unifi_ids & set(entry.runtime_data.site_coordinator.data.devices)
