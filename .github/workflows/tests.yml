@@ -68,4 +68,15 @@ jobs:
           fi
       - name: Show Home Assistant version
         run: python -c "import homeassistant.const as c; print(c.__version__)"
-      - run: pytest -p no:cacheprovider
+      # Coverage settings are in pyproject.toml ([tool.coverage.*]). The job
+      # fails if the coverage drops below the minimum.
+      - name: pytest with coverage
+        run: pytest -p no:cacheprovider --cov --cov-report=term-missing --cov-fail-under=97
+      - name: Coverage summary
+        if: ${{ !cancelled() && hashFiles('.coverage') != '' }}
+        run: |
+          {
+            echo "### Coverage (Home Assistant ${{ matrix.name }}, Python ${{ matrix.python-version }})"
+            echo
+            coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"

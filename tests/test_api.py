@@ -91,6 +91,32 @@ async def test_errors(
         await _client(hass).async_get_application_version()
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        # Standard error body of the API: code and message are passed on.
+        (
+            {"json": {"code": "api.err.Invalid", "message": "Invalid value"}},
+            "HTTP 400: api.err.Invalid Invalid value",
+        ),
+        # Anything else is ignored instead of failing on it.
+        ({"json": ["unexpected"]}, "HTTP 400: "),
+        ({"text": "<html>Bad Request</html>"}, "HTTP 400: "),
+    ],
+)
+async def test_error_message_from_body(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    kwargs: dict,
+    message: str,
+) -> None:
+    """The error message is only taken from the documented error body."""
+    aioclient_mock.get(f"{BASE}/v1/info", status=400, **kwargs)
+    with pytest.raises(UnifiApiError) as err:
+        await _client(hass).async_get_application_version()
+    assert str(err.value).endswith(message)
+
+
 async def test_get_devices_clients_statistics(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
