@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Neu
+- **Standort:** Diagnose-Sensor *UniFi-Network-Version* mit der Version der
+  UniFi-Network-Anwendung (`GET /v1/info`); dieselbe Version steht als Firmware-Version am
+  Standort-Gerät und in den Diagnosedaten. Abfrage beim Start und danach stündlich; ein Fehler
+  dabei verhindert den Start nicht, ein ungültiger API-Schlüssel startet die erneute Anmeldung.
+
 ### Behoben
 - Ein einzelner unerwartet aufgebauter Datensatz der UniFi-API (fehlendes Pflichtfeld oder
   unerwarteter Typ, z. B. nach einem Firmware-Update oder bei einem neuen Gerätetyp) macht

@@ -19,6 +19,9 @@
       "devices": {
         "default": "mdi:router-network"
       },
+      "network_version": {
+        "default": "mdi:information-outline"
+      },
       "device_state": {
         "default": "mdi:help-network",
         "state": {
