@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_SCAN_INTERVAL, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryError,
@@ -123,6 +123,13 @@ async def async_setup_entry(
     )
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+    # Home Assistant only applies device_info when an entity is added. Keep
+    # firmware version and name of the UniFi devices up to date afterwards.
+    entry.async_on_unload(
+        site_coordinator.async_add_listener(
+            lambda: _async_update_device_registry(hass, entry, site_coordinator)
+        )
+    )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Statistics and ports need one request per device. Load them in parallel in
@@ -134,6 +141,48 @@ async def async_setup_entry(
         f"{DOMAIN} {site.name} initial device data",
     )
     return True
+
+
+def _async_get_registry_device(
+    registry: dr.DeviceRegistry, entry_id: str, identifier: tuple[str, str]
+) -> dr.DeviceEntry | None:
+    """Look up a device of the config entry by identifier.
+
+    Home Assistant 2026.11 deprecated async_get_device (identifiers are no longer
+    unique across config entries) in favor of async_get_device_by_identifier.
+    """
+    if hasattr(registry, "async_get_device_by_identifier"):
+        return registry.async_get_device_by_identifier(identifier, entry_id)
+    return registry.async_get_device(identifiers={identifier})
+
+
+@callback
+def _async_update_device_registry(
+    hass: HomeAssistant,
+    entry: UnifiNetworkExtendedConfigEntry,
+    coordinator: UnifiSiteCoordinator,
+) -> None:
+    """Write changed firmware versions and names of UniFi devices to the registry.
+
+    Only ``name`` is updated, a name set by the user (``name_by_user``) is kept.
+    Devices without registry entry (no entities yet) are skipped.
+    """
+    if coordinator.data is None:
+        return
+    registry = dr.async_get(hass)
+    for device in coordinator.data.devices.values():
+        device_entry = _async_get_registry_device(
+            registry, entry.entry_id, (DOMAIN, device.id)
+        )
+        if device_entry is None:
+            continue
+        changes: dict[str, str | None] = {}
+        if device_entry.sw_version != (sw_version := device.firmware_version or None):
+            changes["sw_version"] = sw_version
+        if device.name and device_entry.name != device.name:
+            changes["name"] = device.name
+        if changes:
+            registry.async_update_device(device_entry.id, **changes)
 
 
 async def _async_load_device_data(
