@@ -32,7 +32,7 @@
   des Actions-Laufs angezeigt; der Lauf schlägt unter 97 % fehl
 - Neue Tests für Fehlerpfade: Fehlertext aus der API-Antwort, ungültiger API-Schlüssel und
   unerwartete Fehler beim Abruf je Gerät, alle Standorte bereits eingerichtet, unbekanntes
-  Uplink-Gerät, Funkbänder werden nur einmal angelegt (Abdeckung 97,1 % → 98,4 %)
+  Uplink-Gerät, Funkbänder werden nur einmal angelegt (Abdeckung 97,1 % → 98,0 % auf allen drei getesteten Home-Assistant-Versionen)
 
 ## 0.1.0
 
