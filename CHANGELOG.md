@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Entitäten
+- Geräte, die UniFi nicht mehr meldet, werden nach dem nächsten erfolgreichen Abruf samt Entitäten
+  automatisch aus Home Assistant entfernt (auch beim Start); solche Geräte lassen sich zudem in der
+  Oberfläche von Hand löschen. Offline-Geräte und das Standort-Gerät bleiben erhalten, ein erneut
+  adoptiertes Gerät bekommt wieder Entitäten.
+
 ## 0.1.0
 
 Erstes Release der Home-Assistant-Integration für UniFi Network über die offizielle UniFi Network API

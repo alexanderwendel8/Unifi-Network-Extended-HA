@@ -167,6 +167,15 @@ Statistik-Sensoren kurz nicht verfügbar und die Port-Entitäten erscheinen,
 sobald ihre Daten da sind. Neu adoptierte Geräte
 erhalten ihre Entitäten automatisch, ohne Neustart.
 
+Geräte, die UniFi nicht mehr meldet (z. B. nach „Gerät vergessen“, Rückgabe oder
+Austausch), werden nach dem nächsten erfolgreichen Abruf automatisch samt ihren
+Entitäten aus Home Assistant entfernt, auch wenn das während eines Neustarts von
+Home Assistant passiert ist. Offline-Geräte meldet UniFi weiterhin, sie bleiben
+erhalten. Schlägt ein Abruf fehl, wird nichts entfernt. Ein solches Gerät lässt
+sich außerdem auf seiner Geräteseite von Hand löschen; Geräte, die UniFi noch
+meldet, und das Standort-Gerät nicht. Wird ein entferntes Gerät erneut adoptiert,
+bekommt es wieder neue Entitäten.
+
 **Clients** (Device-Tracker)
 - Für jeden kabelgebundenen oder WLAN-Client mit MAC-Adresse: *zu Hause*, solange
   er verbunden ist. VPN-Verbindungen werden nicht verfolgt.

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import (
@@ -31,6 +32,12 @@ if TYPE_CHECKING:
     from . import UnifiNetworkExtendedConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+
+# Home Assistant 2026.9+ ties a device to a single config entry
+# (`DeviceEntry.config_entry_id`) and deprecates `remove_config_entry_id`; a stale
+# device is deleted with `async_remove_device` there. Older versions share devices
+# between config entries, so only this entry is detached from the device.
+SINGLE_CONFIG_ENTRY_DEVICES = hasattr(dr.DeviceEntry, "config_entry_id")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +87,9 @@ class UnifiSiteCoordinator(DataUpdateCoordinator[UnifiSiteData]):
             raise ConfigEntryAuthFailed(str(err)) from err
         except UnifiApiError as err:
             raise UpdateFailed(str(err)) from err
+        # Only reached after a complete, successful fetch: every adopted device
+        # (including offline ones) is in the response, so a missing one is gone.
+        self._async_remove_stale_devices({device.id for device in devices})
         return UnifiSiteData(
             devices={device.id: device for device in devices},
             clients={client.id: client for client in clients},
@@ -89,6 +99,39 @@ class UnifiSiteCoordinator(DataUpdateCoordinator[UnifiSiteData]):
                 if client.mac_address
             },
         )
+
+    def _async_remove_stale_devices(self, current_ids: set[str]) -> None:
+        """Remove UniFi devices from the registry that UniFi no longer reports.
+
+        Compares against the device registry instead of the previous update, so
+        devices removed while Home Assistant was not running are found as well. The
+        site device and devices without an identifier of this integration (e.g.
+        clients created by device trackers) are kept. Removing a device also removes
+        its entities.
+        """
+        registry = dr.async_get(self.hass)
+        entry_id = self.config_entry.entry_id
+        for device in dr.async_entries_for_config_entry(registry, entry_id):
+            unifi_ids = {
+                identifier[1]
+                for identifier in device.identifiers
+                if identifier[0] == DOMAIN
+            }
+            if (
+                not unifi_ids
+                or device.id == self.site_device_id
+                or self.site.id in unifi_ids
+                or unifi_ids & current_ids
+            ):
+                continue
+            _LOGGER.debug(
+                "Removing device %s, no longer reported by UniFi", device.name
+            )
+            if SINGLE_CONFIG_ENTRY_DEVICES:
+                registry.async_remove_device(device.id)
+            else:
+                # Deletes the device unless another config entry still uses it.
+                registry.async_update_device(device.id, remove_config_entry_id=entry_id)
 
 
 class _UnifiPerDeviceCoordinator[DataT](DataUpdateCoordinator[dict[str, DataT]]):
