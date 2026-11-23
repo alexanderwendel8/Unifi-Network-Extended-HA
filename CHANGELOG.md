@@ -8,6 +8,11 @@
   Standort-Gerät und in den Diagnosedaten. Abfrage beim Start und danach stündlich; ein Fehler
   dabei verhindert den Start nicht, ein ungültiger API-Schlüssel startet die erneute Anmeldung.
 
+### Behoben
+- Firmware-Version und Name der UniFi-Geräte werden im Geräteregister von Home Assistant bei jedem
+  Abruf aktualisiert, ohne die Integration neu zu laden. Ein in Home Assistant vergebener Name
+  bleibt erhalten.
+
 ## 0.1.0
 
 Erstes Release der Home-Assistant-Integration für UniFi Network über die offizielle UniFi Network API
