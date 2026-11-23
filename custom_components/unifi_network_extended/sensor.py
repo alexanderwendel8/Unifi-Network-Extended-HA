@@ -33,6 +33,7 @@ from .api import (
 )
 from .coordinator import UnifiSiteData
 from .entity import (
+    UnifiApplicationInfoEntity,
     UnifiDeviceDetailsEntity,
     UnifiDeviceEntity,
     UnifiDeviceStatisticsEntity,
@@ -81,6 +82,13 @@ class UnifiStatisticsSensorDescription(SensorEntityDescription):
     """Describes a sensor based on the latest device statistics."""
 
     value_fn: Callable[[UnifiDeviceStatistics], float | int | None]
+
+
+NETWORK_VERSION_SENSOR = SensorEntityDescription(
+    key="network_version",
+    translation_key="network_version",
+    entity_category=EntityCategory.DIAGNOSTIC,
+)
 
 
 def _count_clients(client_type: str) -> Callable[[UnifiSiteData], int]:
@@ -399,6 +407,15 @@ async def async_setup_entry(
     async_add_entities(
         UnifiSiteSensor(site_coordinator, description) for description in SITE_SENSORS
     )
+    async_add_entities(
+        [
+            UnifiNetworkVersionSensor(
+                entry.runtime_data.application_info_coordinator,
+                site_coordinator.site,
+                NETWORK_VERSION_SENSOR,
+            )
+        ]
+    )
 
     known: set[str] = set()
 
@@ -479,6 +496,15 @@ class UnifiSiteSensor(UnifiSiteEntity, SensorEntity):
     def native_value(self) -> int:
         """Return the sensor value."""
         return self.entity_description.value_fn(self.coordinator.data)
+
+
+class UnifiNetworkVersionSensor(UnifiApplicationInfoEntity, SensorEntity):
+    """Version of the UniFi Network application, attached to the site device."""
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the application version."""
+        return self.coordinator.data
 
 
 class UnifiDeviceSensor(UnifiDeviceEntity, SensorEntity):

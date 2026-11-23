@@ -102,6 +102,20 @@ async def test_all_sites_configured_aborts(hass: HomeAssistant) -> None:
     assert result["reason"] == "already_configured"
 
 
+async def test_all_of_several_sites_configured_aborts(hass: HomeAssistant) -> None:
+    """Abort instead of showing an empty selection when no site is left."""
+    _entry(hass)
+    MockConfigEntry(
+        domain=DOMAIN,
+        title="Office",
+        unique_id=OFFICE_SITE.id,
+        data={**USER_INPUT, CONF_SITE_ID: OFFICE_SITE.id},
+    ).add_to_hass(hass)
+    result = await _start_user_flow(hass, [DEFAULT_SITE, OFFICE_SITE])
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
 async def test_no_sites_aborts(hass: HomeAssistant) -> None:
     """Abort when the API key sees no sites."""
     result = await _start_user_flow(hass, [])

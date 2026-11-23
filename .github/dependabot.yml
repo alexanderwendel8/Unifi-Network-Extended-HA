@@ -1,10 +1,16 @@
-# Proposes updates for the GitHub Actions in .github/workflows as pull requests.
-# Actions are pinned to a commit SHA with the version as a comment; Dependabot
-# updates both.
+# Proposes dependency updates as pull requests.
 version: 2
 updates:
+  # Keeps the "current" Home Assistant version of the test matrix up to date
+  # (pytest-homeassistant-custom-component in requirements_test.txt).
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+  # GitHub Actions in .github/workflows are pinned to a commit SHA with the
+  # version as a comment; Dependabot updates both.
   - package-ecosystem: github-actions
-    directory: /
+    directory: "/"
     schedule:
       interval: weekly
     groups:

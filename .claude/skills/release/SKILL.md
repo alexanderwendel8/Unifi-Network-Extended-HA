@@ -28,6 +28,8 @@ Tags/Releases gibt.
    ### Geräte / Funktionen / Behoben …
    - …
    ```
+   Laufende Änderungen sammeln sich oberhalb der letzten Version unter `## Unreleased`; die
+   Überschrift wird beim Release zu `## X.Y.Z`.
    Der Workflow schneidet alles zwischen `## X.Y.Z` und der nächsten `## `-Zeile aus. Inhalte aus
    der Git-Historie und den gemergten PRs zusammenfassen, in der Projektsprache; ehrlich angeben,
    was nicht getestet ist.
@@ -120,8 +122,14 @@ Prüfen vor dem Commit: `python3 -c "import yaml; print(list(yaml.safe_load(open
 ## B. Release erstellen (laufender Betrieb)
 
 1. Version mit dem Nutzer klären (AskUserQuestion, Empfehlung zuerst).
-2. Auf dem Arbeitsbranch: Version in der Manifest-Datei setzen, Abschnitt `## X.Y.Z` in
-   `CHANGELOG.md` ergänzen, Tests/Lint laufen lassen, committen, pushen.
+2. Auf dem Arbeitsbranch: Version in der Manifest-Datei setzen und in `CHANGELOG.md`
+   - `## Unreleased` in `## X.Y.Z` umbenennen (exakt so, ohne `v`, ohne Datum – sonst findet der
+     Workflow den Abschnitt nicht), Einträge mit `git log vVORHER..origin/main` abgleichen und
+     eine kurze Einleitung ergänzen,
+   - darüber einen neuen, leeren `## Unreleased` anlegen.
+
+   `## Unreleased` oberhalb stört die Extraktion nicht: sie beginnt erst bei `## X.Y.Z` und endet
+   an der nächsten `## `-Zeile. Danach Tests/Lint laufen lassen, committen, pushen.
 3. PR erstellen (wenn der Nutzer zustimmt), mit `subscribe_pr_activity` beobachten, CI grün halten.
    **Nicht selbst mergen** – der Nutzer merged.
 4. Nach dem Merge den Workflow starten:
@@ -147,3 +155,6 @@ Prüfen vor dem Commit: `python3 -c "import yaml; print(list(yaml.safe_load(open
   HACS-Validierung braucht außerdem Repo-Beschreibung und Topics (setzt der Nutzer in den
   GitHub-Einstellungen) sowie ein Brand-Icon.
 - Keine Modellbezeichnungen in Commits, PRs oder Release Notes.
+- Release-Notizen auf GitHub werden nur beim Workflow-Lauf aus dem Changelog übernommen. Wird ein
+  bereits veröffentlichter Abschnitt nachträglich ergänzt, die Notizen von Hand auf GitHub anpassen
+  (*Releases → Edit*) oder es beim nächsten Release belassen.
