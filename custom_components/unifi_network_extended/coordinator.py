@@ -25,7 +25,7 @@ from .api import (
     UnifiInvalidAuth,
     UnifiSite,
 )
-from .const import DOMAIN, STATISTICS_PARALLEL_REQUESTS
+from .const import APPLICATION_INFO_INTERVAL, DOMAIN, STATISTICS_PARALLEL_REQUESTS
 
 if TYPE_CHECKING:
     from . import UnifiNetworkExtendedConfigEntry
@@ -89,6 +89,44 @@ class UnifiSiteCoordinator(DataUpdateCoordinator[UnifiSiteData]):
                 if client.mac_address
             },
         )
+
+
+class UnifiApplicationInfoCoordinator(DataUpdateCoordinator[str]):
+    """Polls the version of the UniFi Network application (``GET /v1/info``).
+
+    Runs on its own, hourly schedule: the version only changes with an update of
+    the Network application, so it is not worth a request on every site poll.
+    Listeners are only notified when the version (or availability) changes.
+    """
+
+    config_entry: UnifiNetworkExtendedConfigEntry
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: UnifiNetworkExtendedConfigEntry,
+        client: UnifiApiClient,
+        site: UnifiSite,
+    ) -> None:
+        """Initialize the coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            name=f"{DOMAIN} {site.name} application info",
+            update_interval=timedelta(seconds=APPLICATION_INFO_INTERVAL),
+            always_update=False,
+        )
+        self.client = client
+
+    async def _async_update_data(self) -> str:
+        """Fetch the application version."""
+        try:
+            return await self.client.async_get_application_version()
+        except UnifiInvalidAuth as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except UnifiApiError as err:
+            raise UpdateFailed(str(err)) from err
 
 
 class _UnifiPerDeviceCoordinator[DataT](DataUpdateCoordinator[dict[str, DataT]]):
@@ -158,6 +196,8 @@ class _UnifiPerDeviceCoordinator[DataT](DataUpdateCoordinator[dict[str, DataT]])
                 )
                 errors.append(result)
             elif isinstance(result, BaseException):
+                # Unreadable responses arrive as UnifiResponseError (handled
+                # above); anything else is a bug or a cancellation and is passed on.
                 raise result
             else:
                 data[device_id] = result

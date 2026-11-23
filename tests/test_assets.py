@@ -15,6 +15,7 @@ from custom_components.unifi_network_extended.sensor import (
     DEVICE_CLIENTS_SENSOR,
     DEVICE_SENSORS,
     DEVICE_STATES,
+    NETWORK_VERSION_SENSOR,
     PORT_POE_STATES,
     PORT_SENSORS,
     RADIO_SENSORS,
@@ -43,6 +44,7 @@ def test_every_sensor_has_an_icon_and_a_name() -> None:
             RADIO_TX_RETRIES_SENSOR,
             DEVICE_CLIENTS_SENSOR,
             UPTIME_SENSOR,
+            NETWORK_VERSION_SENSOR,
         )
     }
     assert keys == set(icons) == set(strings)
