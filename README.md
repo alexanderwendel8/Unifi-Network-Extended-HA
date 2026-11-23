@@ -112,7 +112,7 @@ Ordner `custom_components/unifi_network_extended` nach
 
 | Feld | Beschreibung |
 |---|---|
-| Host | Hostname oder IP-Adresse des Controllers |
+| Host | Hostname, IPv4- oder IPv6-Adresse des Controllers, ohne `https://` (z. B. `192.168.1.1`, `unifi.local`, `fd00::1`). Ein eingefügtes `https://`, ein Pfad oder ein Port (`unifi.local:8443`, `[fd00::1]:8443`) werden automatisch bereinigt bzw. ins Feld Port übernommen |
 | Port | meist `443` |
 | API-Schlüssel | Wird im Bereich *Integrationen* der UniFi Network Anwendung erzeugt |
 | SSL-Zertifikat prüfen | Nur bei selbstsignierten Zertifikaten deaktivieren |

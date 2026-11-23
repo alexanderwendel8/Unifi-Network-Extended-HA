@@ -17,6 +17,7 @@ from homeassistant.const import CONF_API_KEY, CONF_HOST, CONF_PORT, CONF_VERIFY_
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
+from yarl import URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -268,7 +269,10 @@ class UnifiApiClient:
     ) -> None:
         """Initialize the client."""
         self._session = session
-        self._base_url = f"https://{host}:{port}{API_BASE_PATH}"
+        # yarl puts IPv6 addresses in brackets (https://[fd00::1]:443/...).
+        self._base_url = str(
+            URL.build(scheme="https", host=host, port=port, path=API_BASE_PATH)
+        )
         self._headers = {"X-API-KEY": api_key, "Accept": "application/json"}
 
     async def async_get_application_version(self) -> str:
