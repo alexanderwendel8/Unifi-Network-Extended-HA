@@ -23,6 +23,12 @@ async def async_get_config_entry_diagnostics(
     # Only counts and states; client names and addresses are personal data.
     return {
         "entry": async_redact_data(entry.as_dict(), TO_REDACT),
+        "application": {
+            "last_update_success": (
+                runtime.application_info_coordinator.last_update_success
+            ),
+            "version": runtime.application_info_coordinator.data,
+        },
         "site_coordinator": {
             "last_update_success": runtime.site_coordinator.last_update_success,
             "device_count": len(site_data.devices),

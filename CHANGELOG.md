@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Neu
+- **Standort:** Diagnose-Sensor *UniFi-Network-Version* mit der Version der
+  UniFi-Network-Anwendung (`GET /v1/info`); dieselbe Version steht als Firmware-Version am
+  Standort-Gerät und in den Diagnosedaten. Abfrage beim Start und danach stündlich; ein Fehler
+  dabei verhindert den Start nicht, ein ungültiger API-Schlüssel startet die erneute Anmeldung.
+
 ### Sonstiges
 - Mindestversion Home Assistant 2025.3.0 (wie bisher in `hacs.json`) geprüft und in der README genannt;
   die CI testet jetzt 2025.3.0, 2026.2.3 und die aktuelle Version mit festgelegten Versionen von
