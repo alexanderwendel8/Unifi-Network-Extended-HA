@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+## 0.2.0
+
+Aufräumen und robustere Einrichtung: Geräte, die UniFi nicht mehr meldet, und Client-Tracker
+nach 180 Tagen ohne Verbindung werden entfernt; die Host-Eingabe akzeptiert IPv6-Adressen und wird
+bereinigt; kein doppeltes Neuladen mehr nach „Neu konfigurieren“.
+
 ### Geändert
 - Device-Tracker von Clients, die 180 Tage nicht verbunden waren, werden automatisch entfernt,
   auch eingeschaltete (Prüfung beim Start und täglich). Ein nur für den Tracker angelegtes Gerät
