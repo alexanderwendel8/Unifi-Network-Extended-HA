@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Entwicklung
+- Testabdeckung wird in der CI gemessen (Zeilen und Zweige), im Log und in der Zusammenfassung
+  des Actions-Laufs angezeigt; der Lauf schlägt unter 97 % fehl
+- Neue Tests für Fehlerpfade: Fehlertext aus der API-Antwort, ungültiger API-Schlüssel und
+  unerwartete Fehler beim Abruf je Gerät, alle Standorte bereits eingerichtet, unbekanntes
+  Uplink-Gerät, Funkbänder werden nur einmal angelegt (Abdeckung 97,1 % → 98,4 %)
+
 ## 0.1.0
 
 Erstes Release der Home-Assistant-Integration für UniFi Network über die offizielle UniFi Network API

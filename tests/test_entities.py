@@ -29,7 +29,16 @@ from custom_components.unifi_network_extended.const import (
     DOMAIN,
 )
 
-from .conftest import ACCESS_POINT, GATEWAY, GATEWAY_STATS, NAS, PHONE, SITE, VPN_USER
+from .conftest import (
+    ACCESS_POINT,
+    GATEWAY,
+    GATEWAY_DETAILS,
+    GATEWAY_STATS,
+    NAS,
+    PHONE,
+    SITE,
+    VPN_USER,
+)
 
 
 async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
@@ -457,3 +466,41 @@ async def test_last_restart_is_restored(
         async_fire_time_changed(hass)
         await hass.async_block_till_done(wait_background_tasks=True)
     assert hass.states.get(entity_id).state == "2026-11-22T09:59:30+00:00"
+
+
+async def test_uplink_device_not_adopted(
+    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+) -> None:
+    """An uplink that is not an adopted device of the site has no name."""
+    mock_api["details"].side_effect = None
+    mock_api["details"].return_value = replace(
+        GATEWAY_DETAILS, uplink_device_id="dev-not-adopted"
+    )
+    await _setup(hass, config_entry)
+
+    assert _state(hass, f"{GATEWAY.id}_uplink_device") == "unknown"
+
+
+async def test_radio_entities_are_added_once(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Known radios do not create their entities again on later updates."""
+    mock_api["devices"].return_value = [GATEWAY, replace(ACCESS_POINT, state="ONLINE")]
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    entities = er.async_entries_for_config_entry(registry, config_entry.entry_id)
+
+    freezer.tick(timedelta(seconds=DEFAULT_STATISTICS_INTERVAL))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert mock_api["details"].await_count == 4
+    assert (
+        er.async_entries_for_config_entry(registry, config_entry.entry_id) == entities
+    )
+    assert "does not generate unique IDs" not in caplog.text
+    assert hass.states.get("sensor.access_point_5_ghz_channel").state == "36"

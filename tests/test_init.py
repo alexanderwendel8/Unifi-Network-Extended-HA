@@ -114,3 +114,44 @@ async def test_setup_does_not_wait_for_device_data(
     release.set()
     await hass.async_block_till_done(wait_background_tasks=True)
     assert hass.states.get("sensor.gateway_cpu_utilization").state == "12.5"
+
+
+@pytest.mark.parametrize("mock", ["statistics", "details"])
+async def test_device_data_invalid_auth_starts_reauth(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    mock: str,
+) -> None:
+    """An invalid API key in a per-device request starts the reauth flow."""
+    mock_api[mock].side_effect = UnifiInvalidAuth
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert config_entry.state is ConfigEntryState.LOADED
+    flows = hass.config_entries.flow.async_progress_by_handler(DOMAIN)
+    assert [flow["context"]["source"] for flow in flows] == [SOURCE_REAUTH]
+
+
+async def test_device_data_unexpected_error(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Unexpected errors are not mistaken for a single failing device."""
+    mock_api["devices"].return_value = [GATEWAY, replace(ACCESS_POINT, state="ONLINE")]
+
+    async def statistics(site_id: str, device_id: str) -> UnifiDeviceStatistics:
+        if device_id == ACCESS_POINT.id:
+            raise RuntimeError("boom")
+        return GATEWAY_STATS
+
+    mock_api["statistics"].side_effect = statistics
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    coordinator = config_entry.runtime_data.statistics_coordinator
+    assert not coordinator.last_update_success
+    assert "boom" in caplog.text
+    assert hass.states.get("sensor.gateway_cpu_utilization").state == "unavailable"

@@ -226,6 +226,22 @@ pip install -r requirements_test.txt
 pytest
 ```
 
+### Testabdeckung
+
+Die Abdeckung (Zeilen und Zweige) misst `pytest-cov`, das mit
+`pytest-homeassistant-custom-component` installiert wird. Die Einstellungen stehen in
+`pyproject.toml` (`[tool.coverage.*]`), der Aufruf folgt der
+[Entwickler-Doku von Home Assistant](https://github.com/home-assistant/developers.home-assistant/blob/master/docs/development_testing.md):
+
+```bash
+pytest --cov --cov-report=term-missing
+```
+
+`Missing` nennt die nicht ausgeführten Zeilen und Zweige. Mit `--cov-report=html` entsteht
+zusätzlich ein Bericht in `htmlcov/`. Die CI zeigt die Abdeckung im Log und in der
+Zusammenfassung des Actions-Laufs und schlägt fehl, wenn sie unter 97 % fällt
+(`--cov-fail-under=97` in `.github/workflows/tests.yml`).
+
 ## Releases
 
 Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md). Releases erstellt der Workflow `release.yml`
