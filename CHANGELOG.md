@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Behoben
+- Ein einzelner unerwartet aufgebauter Datensatz der UniFi-API (fehlendes Pflichtfeld oder
+  unerwarteter Typ, z. B. nach einem Firmware-Update oder bei einem neuen Gerätetyp) macht
+  nicht mehr alle Entitäten unverfügbar: Betroffene Standorte, Geräte, Clients, Ports und
+  Funkbänder werden übersprungen, alle übrigen funktionieren weiter.
+- Sind Statistik oder Details eines Geräts nicht auslesbar, betrifft das nur dieses Gerät.
+- Ungültiges JSON (z. B. eine HTML-Seite statt einer API-Antwort) wird als unerwartete Antwort
+  gemeldet, nicht mehr als „nicht erreichbar“.
+- Übersprungene Daten werden je Ursache einmal als Warnung protokolliert, mit Endpunkt und
+  Feldname, aber ohne API-Schlüssel, Host, Namen, MAC-Adressen oder IDs.
+
 ## 0.1.0
 
 Erstes Release der Home-Assistant-Integration für UniFi Network über die offizielle UniFi Network API

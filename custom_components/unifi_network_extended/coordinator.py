@@ -158,6 +158,8 @@ class _UnifiPerDeviceCoordinator[DataT](DataUpdateCoordinator[dict[str, DataT]])
                 )
                 errors.append(result)
             elif isinstance(result, BaseException):
+                # Unreadable responses arrive as UnifiResponseError (handled
+                # above); anything else is a bug or a cancellation and is passed on.
                 raise result
             else:
                 data[device_id] = result
