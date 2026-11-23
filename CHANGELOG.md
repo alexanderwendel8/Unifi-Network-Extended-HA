@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Neu
+- **Standort:** Diagnose-Sensor *UniFi-Network-Version* mit der Version der
+  UniFi-Network-Anwendung (`GET /v1/info`); dieselbe Version steht als Firmware-Version am
+  Standort-Gerät und in den Diagnosedaten. Abfrage beim Start und danach stündlich; ein Fehler
+  dabei verhindert den Start nicht, ein ungültiger API-Schlüssel startet die erneute Anmeldung.
+
 ### Behoben
 - Firmware-Version und Name der UniFi-Geräte werden im Geräteregister von Home Assistant bei jedem
   Abruf aktualisiert, ohne die Integration neu zu laden. Ein in Home Assistant vergebener Name

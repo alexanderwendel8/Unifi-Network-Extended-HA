@@ -30,6 +30,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import (
+    UnifiApplicationInfoCoordinator,
     UnifiDeviceDetailsCoordinator,
     UnifiSiteCoordinator,
     UnifiStatisticsCoordinator,
@@ -53,6 +54,7 @@ class UnifiRuntimeData:
     site_coordinator: UnifiSiteCoordinator
     statistics_coordinator: UnifiStatisticsCoordinator
     details_coordinator: UnifiDeviceDetailsCoordinator
+    application_info_coordinator: UnifiApplicationInfoCoordinator
 
 
 type UnifiNetworkExtendedConfigEntry = ConfigEntry[UnifiRuntimeData]
@@ -80,14 +82,45 @@ async def async_setup_entry(
         # Not retried: the site was deleted or the API key has no access to it.
         raise ConfigEntryError(f"Site {entry.title} no longer exists")
 
+    # Version of the Network application, shown as software version of the site
+    # device. Not required for the setup: a failure is logged, the version stays
+    # unknown until the next hourly check. An invalid API key starts the reauth
+    # flow (handled by the coordinator).
+    application_info_coordinator = UnifiApplicationInfoCoordinator(
+        hass, entry, client, site
+    )
+    await application_info_coordinator.async_refresh()
+
     # Register the site device first, UniFi devices reference it as parent.
-    site_device = dr.async_get(hass).async_get_or_create(
+    # An unknown version is not passed, so a version stored earlier is kept.
+    device_registry = dr.async_get(hass)
+    site_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, site.id)},
         name=site.name,
         manufacturer=MANUFACTURER,
         model=SITE_MODEL,
         entry_type=dr.DeviceEntryType.SERVICE,
+        **(
+            {"sw_version": application_info_coordinator.data}
+            if application_info_coordinator.data
+            else {}
+        ),
+    )
+
+    @callback
+    def _async_update_site_device_version() -> None:
+        """Store a changed application version on the site device."""
+        version = application_info_coordinator.data
+        device = device_registry.async_get(site_device.id)
+        if version and device is not None and device.sw_version != version:
+            device_registry.async_update_device(site_device.id, sw_version=version)
+
+    # Also keeps the hourly check running if the version sensor is disabled.
+    entry.async_on_unload(
+        application_info_coordinator.async_add_listener(
+            _async_update_site_device_version
+        )
     )
 
     site_coordinator = UnifiSiteCoordinator(
@@ -120,6 +153,7 @@ async def async_setup_entry(
         site_coordinator=site_coordinator,
         statistics_coordinator=statistics_coordinator,
         details_coordinator=details_coordinator,
+        application_info_coordinator=application_info_coordinator,
     )
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
