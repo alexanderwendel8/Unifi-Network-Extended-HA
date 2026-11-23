@@ -228,7 +228,8 @@ pytest
 
 ## Releases
 
-Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md). Releases erstellt der Workflow `release.yml`
+Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md); was noch in keinem Release ist, steht dort
+unter „Unreleased“. Releases erstellt der Workflow `release.yml`
 mit den Notizen aus dem Changelog – entweder per Tag `vX.Y.Z` oder manuell unter
 *Actions → Release → Run workflow* (auf `main`, Eingabe z. B. `0.1.0`; der Tag wird dann gesetzt).
 Die Version muss zu `manifest.json` passen. Marketplace bzw. HACS zeigen dann die Versionsnummer

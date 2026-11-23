@@ -13,6 +13,9 @@
 - Listen-Endpunkte sind paginiert (`offset`/`limit`, max. 200); `_get_all_pages` verwenden.
 - API-Key, Host und andere Geheimnisse nie loggen; in Diagnosedaten schwärzen.
 - Tests: `pytest` (siehe `requirements_test.txt`).
+- Jede Änderung (Code, Doku, Workflows) bekommt einen Eintrag unter `## Unreleased` in
+  `CHANGELOG.md`, auf Deutsch und in der passenden Unterrubrik. Gibt es den Abschnitt nicht,
+  wird er direkt unter der Einleitung angelegt.
 - Releases: Ablauf und wiederverwendbare Vorlage in `.claude/skills/release/SKILL.md`
   (Version in `manifest.json` + Abschnitt in `CHANGELOG.md`, dann Workflow `release.yml` manuell auf `main` starten).
 
