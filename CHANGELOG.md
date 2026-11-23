@@ -29,6 +29,10 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 - Ungültige Hosts werden mit dem Fehler „Ungültiger Host“ abgelehnt, statt eine Verbindung zu versuchen
 - Beim Neu konfigurieren bleiben die Eingaben nach einem Fehler im Formular erhalten
 
+### Behoben
+- Neu konfigurieren und erneute Anmeldung laden die Integration nur noch einmal statt zweimal neu.
+  Der Listener für Optionen lädt nur noch bei geänderten Optionen neu.
+
 ### Dokumentation
 - Changelog: Abschnitt „Unreleased“ für laufende Änderungen; Release-Ablauf entsprechend angepasst
 - README: „Getestete Geräte“ nennt Version 0.1.1 und die UniFi-Network-Anwendung 11.0.104
