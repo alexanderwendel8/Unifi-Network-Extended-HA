@@ -19,6 +19,16 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 - README: Getestete Version auf 0.2.0 aktualisiert (Statuszeile und Tabelle „Getestete Geräte“).
 
+### Entwicklung
+
+- Neuer Workflow `update-check.yml`: prüft jeden Montag GitHub Actions, gepinnte Python-Pakete
+  und neue Home-Assistant-Releases (samt Python-Mindestversion) und legt für jede veraltete
+  Komponente ein Issue mit dem Label `aktualisierung` an. Ist die Komponente wieder aktuell,
+  wird das Issue geschlossen. Logik in `.github/scripts/check_updates.py`, mit Tests.
+- `ruff` prüft auch `.github/scripts`.
+- `CLAUDE.md`: Offene Issues mit dem Label `aktualisierung` werden zu Beginn jeder Sitzung
+  geprüft; abgearbeitet werden sie nur nach Rückfrage.
+
 ## 0.2.0
 
 Aufräumen und robustere Einrichtung: Geräte, die UniFi nicht mehr meldet, und Client-Tracker

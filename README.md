@@ -268,6 +268,19 @@ Die verwendeten GitHub Actions sind auf einen Commit-SHA mit der Version als Kom
 festgelegt. [Dependabot](.github/dependabot.yml) prüft wöchentlich auf neue Versionen und
 schlägt Updates als Pull Request vor.
 
+Zusätzlich prüft der Workflow [`update-check.yml`](.github/workflows/update-check.yml)
+jeden Montag alle externen Komponenten und legt für jede veraltete Komponente ein Issue mit
+dem Label `aktualisierung` an:
+- **GitHub Actions** in `.github/workflows` (neues Release)
+- **Python-Pakete**, die in `requirements_test.txt` oder den Workflows fest gepinnt sind
+  (zum Beispiel `ruff`, `pytest-homeassistant-custom-component`)
+- **Home Assistant:** neues Monatsrelease gegenüber der im README getesteten Version und
+  eine höhere Python-Mindestversion als in der Test-Matrix
+
+Ist die Komponente wieder aktuell, schließt der Workflow das Issue selbst. Die Prüfungen stehen
+in [`.github/scripts/check_updates.py`](.github/scripts/check_updates.py); lokal zeigt
+`python .github/scripts/check_updates.py --dry-run` das Ergebnis, ohne Issues zu ändern.
+
 Neue Funktionen werden ausschließlich gegen die offizielle API aus
 `docs/unifi-network-api.openapi.json` entwickelt (siehe `CLAUDE.md`).
 
