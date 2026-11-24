@@ -1,0 +1,100 @@
+name: Pre-release
+
+# Erstellt eine Vorabversion (GitHub-Pre-Release) vom aktuellen Stand von main,
+# ohne Pull Request: Eingabe ist die geplante nächste Version X.Y.Z, daraus wird
+# vX.Y.Zb1, beim nächsten Lauf vX.Y.Zb2 usw.
+#
+# Der Tag zeigt auf einen eigenen Commit (nicht auf main), in dem nur die
+# Version in manifest.json auf X.Y.ZbN gesetzt ist; main bleibt unverändert.
+# Die Notizen kommen aus dem Abschnitt "## Unreleased" in CHANGELOG.md.
+#
+# Der Marketplace bietet Vorabversionen nur an, wenn beim Repository der
+# Schalter "Pre-release" eingeschaltet ist.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Geplante nächste Version ohne v, z. B. 0.4.0 (höher als manifest.json)"
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  prerelease:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Version bestimmen, Tag anlegen und Notizen extrahieren
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Vorabversionen nur von main (aktuell $GITHUB_REF)"
+            exit 1
+          fi
+          version="${INPUT_VERSION#v}"
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Ungültige Version '$version' (erwartet X.Y.Z)"
+            exit 1
+          fi
+          manifest_file=custom_components/unifi_network_extended/manifest.json
+          manifest=$(python3 -c "import json; print(json.load(open('$manifest_file'))['version'])")
+          # Die Vorabversion muss zu einer noch nicht veröffentlichten Version gehören.
+          if ! python3 -c "import sys; v=lambda s: tuple(map(int, s.split('.'))); sys.exit(0 if v('$version') > v('$manifest') else 1)"; then
+            echo "::error::Version $version muss höher sein als manifest.json ($manifest)"
+            exit 1
+          fi
+
+          tags=$(git ls-remote --tags --refs origin "refs/tags/v${version}*" | sed 's#.*refs/tags/##')
+          if echo "$tags" | grep -Fxq "v$version"; then
+            echo "::error::Version $version ist bereits veröffentlicht"
+            exit 1
+          fi
+          last=$(echo "$tags" | sed -n "s/^v${version//./\\.}b\([0-9][0-9]*\)$/\1/p" | sort -n | tail -1)
+          pre="${version}b$(( ${last:-0} + 1 ))"
+          tag="v$pre"
+
+          awk '
+            /^## Unreleased$/ {found=1; next}
+            found && /^## / {exit}
+            found {print}
+          ' CHANGELOG.md > changes.md
+          if ! grep -q '[^[:space:]]' changes.md; then
+            echo "::error::Der Abschnitt '## Unreleased' in CHANGELOG.md ist leer"
+            exit 1
+          fi
+          {
+            echo "Vorabversion von \`main\` (Commit ${GITHUB_SHA::7}) zum Testen vor Version $version."
+            echo "Der Marketplace bietet sie nur an, wenn beim Repository der Schalter"
+            echo "**Pre-release** eingeschaltet ist."
+            cat changes.md
+          } > release_notes.md
+
+          # Nur die Versionszeile ändern, der Rest der Datei bleibt, wie er ist.
+          sed -i "s/\"version\": \"$manifest\"/\"version\": \"$pre\"/" "$manifest_file"
+          if [ "$(python3 -c "import json; print(json.load(open('$manifest_file'))['version'])")" != "$pre" ]; then
+            echo "::error::Version in manifest.json konnte nicht gesetzt werden"
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Vorabversion $pre" -- "$manifest_file"
+          git tag "$tag"
+          git push origin "refs/tags/$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Vorabversion $tag erstellt" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          body_path: release_notes.md
+          prerelease: true
+          make_latest: "false"
