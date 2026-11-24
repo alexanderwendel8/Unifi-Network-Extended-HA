@@ -23,6 +23,13 @@
 - Jede Änderung (Code, Doku, Workflows) bekommt einen Eintrag unter `## Unreleased` in
   `CHANGELOG.md`, auf Deutsch und in der passenden Unterrubrik. Gibt es den Abschnitt nicht,
   wird er direkt unter der Einleitung angelegt.
+- README und Changelog gibt es auf Deutsch (`README.md`, `CHANGELOG.md`) und Englisch
+  (`README.en.md`, `CHANGELOG.en.md`). **Beide Fassungen werden immer gemeinsam gepflegt:**
+  Jede Änderung an einer Datei kommt im selben Commit inhaltsgleich in die andere, mit
+  demselben Aufbau (gleiche Überschriften-Struktur, gleiche Anzahl Einträge je
+  Changelog-Rubrik). Der Changelog-Eintrag aus der vorigen Regel wird also in beiden Dateien
+  angelegt, beim Release werden beide Abschnitte `## Unreleased` umbenannt.
+  `tests/test_docs.py` prüft die Übereinstimmung; neue Changelog-Rubriken dort eintragen.
 - Releases: Ablauf und wiederverwendbare Vorlage in `.claude/skills/release/SKILL.md`
   (Version in `manifest.json` + Abschnitt in `CHANGELOG.md`, dann Workflow `release.yml` manuell auf `main` starten).
 

@@ -1,5 +1,7 @@
 # UniFi Network Extended für Home Assistant
 
+**Sprache:** Deutsch · [English](README.en.md)
+
 [![Tests](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/tests.yml/badge.svg)](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/tests.yml) [![Validate](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/validate.yml/badge.svg)](https://github.com/alexanderwendel8/Unifi-Network-Extended-HA/actions/workflows/validate.yml)
 
 Custom Integration für Home Assistant, die eine UniFi Network Anwendung
@@ -283,7 +285,6 @@ dem Label `aktualisierung` an:
   (zum Beispiel `ruff`, `pytest-homeassistant-custom-component`)
 - **Home Assistant:** neues Monatsrelease gegenüber der im README getesteten Version und
   eine höhere Python-Mindestversion als in der Test-Matrix
-
 - **UniFi Network API:** neuere gespiegelte Version als die, gegen die entwickelt wird
 
 Ist die Komponente wieder aktuell, schließt der Workflow das Issue selbst. Die Prüfungen stehen
@@ -303,6 +304,11 @@ pip install -r requirements_test.txt
 pytest
 ```
 
+README und Changelog gibt es auf Deutsch (`README.md`, `CHANGELOG.md`) und Englisch
+(`README.en.md`, `CHANGELOG.en.md`). Beide Fassungen werden gemeinsam gepflegt: Jede Änderung
+kommt in beide Dateien, mit demselben Aufbau. Ein Test (`tests/test_docs.py`) prüft, dass
+Überschriften und Changelog-Einträge übereinstimmen.
+
 ### Testabdeckung
 
 Die Abdeckung (Zeilen und Zweige) misst `pytest-cov`, das mit
@@ -321,9 +327,9 @@ Zusammenfassung des Actions-Laufs und schlägt fehl, wenn sie unter 97 % fällt
 
 ## Releases
 
-Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md); was noch in keinem Release ist, steht dort
-unter „Unreleased“. Releases erstellt der Workflow `release.yml`
-mit den Notizen aus dem Changelog – entweder per Tag `vX.Y.Z` oder manuell unter
+Änderungen stehen in [`CHANGELOG.md`](CHANGELOG.md) (Englisch: [`CHANGELOG.en.md`](CHANGELOG.en.md));
+was noch in keinem Release ist, steht dort unter „Unreleased“. Releases erstellt der Workflow
+`release.yml` mit den Notizen aus dem deutschen Changelog – entweder per Tag `vX.Y.Z` oder manuell unter
 *Actions → Release → Run workflow* (auf `main`, Eingabe z. B. `0.1.0`; der Tag wird dann gesetzt).
 Die Version muss zu `manifest.json` passen. Marketplace bzw. HACS zeigen dann die Versionsnummer
 statt des Commit-Hashs und bieten neue Releases als Update an.
