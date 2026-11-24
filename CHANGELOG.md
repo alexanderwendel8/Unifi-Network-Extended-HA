@@ -26,6 +26,7 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
   Komponente ein Issue mit dem Label `aktualisierung` an. Ist die Komponente wieder aktuell,
   wird das Issue geschlossen. Logik in `.github/scripts/check_updates.py`, mit Tests.
 - `ruff` prüft auch `.github/scripts`.
+- `ruff` auf 0.17.6 aktualisiert (#34).
 - `CLAUDE.md`: Offene Issues mit dem Label `aktualisierung` werden zu Beginn jeder Sitzung
   geprüft; abgearbeitet werden sie nur nach Rückfrage.
 
