@@ -13,6 +13,7 @@ from homeassistant.config_entries import (
     ConfigFlow,
     ConfigFlowResult,
     OptionsFlow,
+    OptionsFlowWithReload,
 )
 from homeassistant.const import (
     CONF_API_KEY,
@@ -340,8 +341,12 @@ def _interval_selector(minimum: int) -> vol.All:
     )
 
 
-class UnifiNetworkExtendedOptionsFlow(OptionsFlow):
-    """Options: polling intervals and client tracking."""
+class UnifiNetworkExtendedOptionsFlow(OptionsFlowWithReload):
+    """Options: polling intervals and client tracking.
+
+    Home Assistant reloads the entry once when the options changed, so a new
+    interval or client tracking takes effect right away.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

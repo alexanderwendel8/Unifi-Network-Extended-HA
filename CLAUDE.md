@@ -13,7 +13,7 @@
 - Listen-Endpunkte sind paginiert (`offset`/`limit`, max. 200); `_get_all_pages` verwenden.
 - API-Key, Host und andere Geheimnisse nie loggen; in Diagnosedaten schwärzen.
 - Tests: `pytest` (siehe `requirements_test.txt`). Die CI (`.github/workflows/tests.yml`)
-  testet die Mindestversion aus `hacs.json` (2025.3.0), 2026.2.3 (letzte Version für
+  testet die Mindestversion aus `hacs.json` (2025.8.0), 2026.2.3 (letzte Version für
   Python 3.13) und die aktuelle Version; die Mindestversion in `hacs.json`, README und
   Workflow gemeinsam ändern.
 - Jede Änderung (Code, Doku, Workflows) bekommt einen Eintrag unter `## Unreleased` in

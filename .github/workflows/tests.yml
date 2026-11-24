@@ -33,11 +33,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Minimum version from hacs.json (2025.3.0 = first release with
-          # AddConfigEntryEntitiesCallback). Keep in sync with hacs.json.
-          - name: "2025.3.0 (minimum)"
+          # Minimum version from hacs.json (2025.8.0 = first release with
+          # OptionsFlowWithReload). Keep in sync with hacs.json.
+          - name: "2025.8.0 (minimum)"
             python-version: "3.13"
-            plugin: "0.13.221"
+            plugin: "0.13.269"
+            # aiodns 3.5.0 (pinned by Home Assistant 2025.8.0) does not
+            # import with pycares 5, which pip would install otherwise.
+            extra: "pycares<5"
           # Last Home Assistant release for Python 3.13 (older API paths,
           # e.g. via_device instead of via_device_id).
           - name: "2026.2.3"
@@ -58,11 +61,12 @@ jobs:
       - name: Install test dependencies
         env:
           PLUGIN_VERSION: ${{ matrix.plugin }}
+          EXTRA_PACKAGES: ${{ matrix.extra }}
         run: |
           if [ -n "$PLUGIN_VERSION" ]; then
-            # Home Assistant 2025.3.0 pins a yanked aiohttp release; pip still
-            # installs it for an exact pin (with a warning).
-            pip install "pytest-homeassistant-custom-component==$PLUGIN_VERSION"
+            # EXTRA_PACKAGES is unquoted on purpose: empty or a list of specs.
+            # shellcheck disable=SC2086
+            pip install "pytest-homeassistant-custom-component==$PLUGIN_VERSION" $EXTRA_PACKAGES
           else
             pip install -r requirements_test.txt
           fi

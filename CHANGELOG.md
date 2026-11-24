@@ -5,6 +5,16 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Geändert
+- Optionen nutzen das automatische Neuladen von Home Assistant (`OptionsFlowWithReload`) statt
+  eines eigenen Update-Listeners. Eine Änderung von Abrufintervall oder „Clients verfolgen“ wirkt
+  weiterhin sofort und lädt den Eintrag genau einmal neu; „Neu konfigurieren“ und die erneute
+  Anmeldung laden ebenfalls genau einmal neu. Damit entfällt die Warnung „has an update listener
+  and should use it for scheduling a reload“, die Home Assistant seit 2026.6 bei „Neu konfigurieren“
+  und erneuter Anmeldung ins Log schreibt.
+- Mindestversion von Home Assistant auf **2025.8.0** angehoben (erste Version mit
+  `OptionsFlowWithReload`); `hacs.json`, README, `CLAUDE.md` und Test-Workflow angepasst.
+
 ### Dokumentation
 
 - README: Getestete Version auf 0.2.0 aktualisiert (Statuszeile und Tabelle „Getestete Geräte“).
