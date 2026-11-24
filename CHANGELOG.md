@@ -5,6 +5,13 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+## 0.3.0
+
+Optionen laden über das eingebaute Neuladen von Home Assistant; dafür ist jetzt
+**Home Assistant 2025.8.0 oder neuer** nötig. Dazu eine wöchentliche automatische Prüfung
+externer Komponenten. Am echten UniFi-Netz getestet ist bisher 0.2.0; 0.3.0 ist durch die
+automatischen Tests (Home Assistant 2025.8.0 bis aktuell) geprüft.
+
 ### Geändert
 - Optionen nutzen das automatische Neuladen von Home Assistant (`OptionsFlowWithReload`) statt
   eines eigenen Update-Listeners. Eine Änderung von Abrufintervall oder „Clients verfolgen“ wirkt
