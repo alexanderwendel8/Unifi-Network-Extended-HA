@@ -660,9 +660,12 @@ class UnifiApiClient:
                         f"{method} {path}: the response is not valid JSON"
                     ) from err
         except (TimeoutError, aiohttp.ClientError) as err:
-            # Headers (API key) are never logged.
-            _LOGGER.debug("Error requesting %s %s: %s", method, path, err)
-            raise UnifiCannotConnect from err
+            # Only the error type: the text of aiohttp errors can contain the host,
+            # which is never logged (nor are the headers with the API key).
+            reason = "timeout" if isinstance(err, TimeoutError) else type(err).__name__
+            raise UnifiCannotConnect(
+                f"{method} {path}: cannot connect ({reason})"
+            ) from err
 
 
 async def _error_message(response: aiohttp.ClientResponse) -> str:

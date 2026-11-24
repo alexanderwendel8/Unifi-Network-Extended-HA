@@ -5,6 +5,14 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Behoben
+
+- Bei Verbindungsfehlern (Zeitüberschreitung, Verbindung abgelehnt) blieb die Meldung
+  „Error fetching … data:“ im Log leer. Jetzt stehen Anfrage und Fehlerart darin, z. B.
+  `GET /v1/sites/…/devices: cannot connect (timeout)`, weiterhin ohne Host und API-Key. Die
+  Debug-Meldung dazu enthielt bisher den Fehlertext von aiohttp und damit unter Umständen den
+  Host; sie entfällt.
+
 ## 0.3.0
 
 Optionen laden über das eingebaute Neuladen von Home Assistant; dafür ist jetzt
