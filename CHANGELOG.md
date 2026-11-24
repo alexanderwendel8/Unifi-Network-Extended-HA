@@ -1,18 +1,18 @@
 # Changelog
 
+**Sprache:** Deutsch · [English](CHANGELOG.en.md)
+
 Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuerst unter
 „Unreleased“; beim nächsten Release wird dieser Abschnitt zur Versionsnummer.
 
 ## Unreleased
 
-### Entwicklung
-
-- Neuer Workflow `prerelease.yml`: erstellt manuell eine Vorabversion (`vX.Y.Zb1`, `b2` …) vom
-  aktuellen Stand von `main`, mit den Notizen aus „Unreleased“. So lassen sich Änderungen über
-  den Marketplace testen (Schalter „Pre-release“ beim Repository), ohne ein Release zu machen.
-
 ### Entitäten
 
+- Die Port-Sensoren **Geschwindigkeit** und **PoE-Status** stehen auf der Geräteseite jetzt unter
+  „Diagnose“ statt unter „Sensoren“; unter „Sensoren“ bleibt je Port nur die Verbindung. Das
+  entspricht der Einordnung in der offiziellen UniFi-Integration. Entitäts-IDs, Werte, Verlauf
+  und Automationen bleiben unverändert.
 - Die Kanalbreite je Funkband wird ohne Nachkommastellen angezeigt (z. B. „160 MHz“).
 - Neuer Sensor **Sendeleistung** je Funkband eines Access Points (Diagnose): der eingestellte
   Modus Automatisch, Niedrig, Mittel, Hoch, Benutzerdefiniert oder Deaktiviert. UniFi liefert
@@ -26,15 +26,6 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
   Endpunkte dazugekommen oder weggefallen. Funkbänder mit 0,9 GHz und der WLAN-Standard
   802.11ah (Wi-Fi HaLow) werden wie die anderen Bänder dargestellt.
 
-### Entwicklung
-
-- Neuer Workflow `api-mirror.yml`: spiegelt jeden Montag die offiziellen Spezifikationen der
-  UniFi Network API von developer.ui.com nach `docs/api/network/<Version>/openapi.json`
-  (Übersicht in `docs/api/README.md`). Vorhandene Versionen werden nie geändert oder gelöscht.
-  Logik in `.github/scripts/mirror_api.py`, mit Tests.
-- `update-check.yml` legt ein Issue an, wenn eine neuere API-Version gespiegelt ist als die,
-  gegen die entwickelt wird (`docs/unifi-network-api.openapi.json`).
-
 ### Behoben
 
 - Bei Verbindungsfehlern (Zeitüberschreitung, Verbindung abgelehnt) blieb die Meldung
@@ -42,6 +33,24 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
   `GET /v1/sites/…/devices: cannot connect (timeout)`, weiterhin ohne Host und API-Key. Die
   Debug-Meldung dazu enthielt bisher den Fehlertext von aiohttp und damit unter Umständen den
   Host; sie entfällt.
+
+### Dokumentation
+
+- README und Changelog gibt es jetzt auch auf Englisch (`README.en.md`, `CHANGELOG.en.md`).
+  Beide Sprachfassungen werden gemeinsam gepflegt; ein Test prüft, dass Überschriften und
+  Changelog-Einträge übereinstimmen.
+
+### Entwicklung
+
+- Neuer Workflow `prerelease.yml`: erstellt manuell eine Vorabversion (`vX.Y.Zb1`, `b2` …) vom
+  aktuellen Stand von `main`, mit den Notizen aus „Unreleased“. So lassen sich Änderungen über
+  den Marketplace testen (Schalter „Pre-release“ beim Repository), ohne ein Release zu machen.
+- Neuer Workflow `api-mirror.yml`: spiegelt jeden Montag die offiziellen Spezifikationen der
+  UniFi Network API von developer.ui.com nach `docs/api/network/<Version>/openapi.json`
+  (Übersicht in `docs/api/README.md`). Vorhandene Versionen werden nie geändert oder gelöscht.
+  Logik in `.github/scripts/mirror_api.py`, mit Tests.
+- `update-check.yml` legt ein Issue an, wenn eine neuere API-Version gespiegelt ist als die,
+  gegen die entwickelt wird (`docs/unifi-network-api.openapi.json`).
 
 ## 0.3.0
 
