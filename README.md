@@ -162,12 +162,17 @@ Home Assistant automatisch einen neuen an.
   Störungen oder Überlast)
 
 **Pro Port** (Switches, Gateways mit Switch-Ports)
-- Verbindung (verbunden/getrennt) und aktuelle Geschwindigkeit
-- Maximale Geschwindigkeit und Anschlusstyp (RJ45, SFP, SFP+ …) (standardmäßig deaktiviert)
-- Nur PoE-Ports: PoE-Status (Liefert Strom, Aus, Begrenzt) und Knopf
+- Verbindung (verbunden/getrennt)
+- Aktuelle Geschwindigkeit (Diagnose)
+- Maximale Geschwindigkeit und Anschlusstyp (RJ45, SFP, SFP+ …) (Diagnose, standardmäßig
+  deaktiviert)
+- Nur PoE-Ports: PoE-Status (Liefert Strom, Aus, Begrenzt; Diagnose) und Knopf
   *PoE neu starten* (Power-Cycle, z. B. für hängende Kameras oder Access Points);
   beide nur aktiviert, wo PoE eingeschaltet ist. PoE aktiviert, PoE-Standard und
   PoE-Typ als Diagnose (standardmäßig deaktiviert)
+
+Auf der Geräteseite steht damit je Port nur die Verbindung unter „Sensoren“, alles Weitere
+unter „Diagnose“.
 
 PoE lässt sich über die offizielle API nicht dauerhaft ein- oder ausschalten, und
 die Leistungsaufnahme wird nicht geliefert.

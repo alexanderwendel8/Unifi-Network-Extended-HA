@@ -13,6 +13,10 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ### Entitäten
 
+- Die Port-Sensoren **Geschwindigkeit** und **PoE-Status** stehen auf der Geräteseite jetzt unter
+  „Diagnose“ statt unter „Sensoren“; unter „Sensoren“ bleibt je Port nur die Verbindung. Das
+  entspricht der Einordnung in der offiziellen UniFi-Integration. Entitäts-IDs, Werte, Verlauf
+  und Automationen bleiben unverändert.
 - Die Kanalbreite je Funkband wird ohne Nachkommastellen angezeigt (z. B. „160 MHz“).
 - Neuer Sensor **Sendeleistung** je Funkband eines Access Points (Diagnose): der eingestellte
   Modus Automatisch, Niedrig, Mittel, Hoch, Benutzerdefiniert oder Deaktiviert. UniFi liefert

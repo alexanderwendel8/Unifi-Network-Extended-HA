@@ -257,6 +257,7 @@ PORT_SENSORS: tuple[UnifiPortSensorDescription, ...] = (
         device_class=SensorDeviceClass.DATA_RATE,
         native_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
         state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
         # Only reported while the link is up.
         value_fn=lambda port: port.speed_mbps if port.state == "UP" else 0,
     ),
@@ -283,6 +284,7 @@ PORT_SENSORS: tuple[UnifiPortSensorDescription, ...] = (
         translation_key="port_poe_state",
         device_class=SensorDeviceClass.ENUM,
         options=PORT_POE_STATES,
+        entity_category=EntityCategory.DIAGNOSTIC,
         exists_fn=_has_poe,
         # Only enabled by default where PoE is switched on.
         enabled_fn=lambda port: port.poe is not None and port.poe.enabled,

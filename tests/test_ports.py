@@ -12,6 +12,7 @@ from homeassistant.const import (
     STATE_OFF,
     STATE_ON,
     STATE_UNAVAILABLE,
+    EntityCategory,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -102,6 +103,21 @@ async def test_port_link_and_speed(
     assert _state(hass, "sensor", 3, "link_speed") == "10000"
     assert hass.states.get("binary_sensor.gateway_port_1_link").state == STATE_ON
     assert hass.states.get("sensor.gateway_port_1_link_speed").state == "1000"
+    # Only the link is a primary entity; speed and PoE state are diagnostics.
+    registry = er.async_get(hass)
+    categories = {
+        key: registry.async_get(_entity_id(hass, domain, 1, key)).entity_category
+        for domain, key in (
+            ("binary_sensor", "link"),
+            ("sensor", "link_speed"),
+            ("sensor", "poe_state"),
+        )
+    }
+    assert categories == {
+        "link": None,
+        "link_speed": EntityCategory.DIAGNOSTIC,
+        "poe_state": EntityCategory.DIAGNOSTIC,
+    }
 
 
 async def test_port_diagnostics_disabled_by_default(
