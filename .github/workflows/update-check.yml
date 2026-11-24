@@ -1,0 +1,35 @@
+name: Update check
+
+# Checks external components (GitHub Actions, pinned Python packages, Home
+# Assistant release and Python requirement) and keeps one issue with the
+# label "aktualisierung" per outdated component. Logic and list of checks:
+# .github/scripts/check_updates.py
+
+on:
+  schedule:
+    # Weekly, Monday morning (UTC).
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: Externe Komponenten prüfen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      # Only the standard library is used; no dependencies to install.
+      - name: Check components and sync issues
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/scripts/check_updates.py
