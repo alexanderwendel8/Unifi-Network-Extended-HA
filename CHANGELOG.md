@@ -13,6 +13,7 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ### Entitäten
 
+- Die Kanalbreite je Funkband wird ohne Nachkommastellen angezeigt (z. B. „160 MHz“).
 - Neuer Sensor **Sendeleistung** je Funkband eines Access Points (Diagnose): der eingestellte
   Modus Automatisch, Niedrig, Mittel, Hoch, Benutzerdefiniert oder Deaktiviert. UniFi liefert
   den Wert ab UniFi Network 11.0; bei älteren Versionen wird der Sensor nicht angelegt. Nach

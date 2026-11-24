@@ -408,6 +408,9 @@ async def test_radio_sensors(
     assert hass.states.get("sensor.access_point_2_4_ghz_channel").state == "6"
     assert hass.states.get("sensor.access_point_5_ghz_channel").state == "36"
     assert hass.states.get("sensor.access_point_5_ghz_channel_width").state == "160"
+    # Shown without decimal places.
+    width = er.async_get(hass).async_get("sensor.access_point_5_ghz_channel_width")
+    assert width.options["sensor"]["suggested_display_precision"] == 0
     assert (
         hass.states.get("sensor.access_point_5_ghz_wi_fi_standard").state == "802.11be"
     )

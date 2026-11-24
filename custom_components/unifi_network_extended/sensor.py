@@ -371,6 +371,8 @@ RADIO_SENSORS: tuple[UnifiRadioSensorDescription, ...] = (
         translation_key="radio_channel_width",
         native_unit_of_measurement=UnitOfFrequency.MEGAHERTZ,
         device_class=SensorDeviceClass.FREQUENCY,
+        # Channel widths are whole numbers (20, 40, 80, 160, 320 MHz).
+        suggested_display_precision=0,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda radio: radio.channel_width_mhz,
     ),
