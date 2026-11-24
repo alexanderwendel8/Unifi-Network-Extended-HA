@@ -129,6 +129,29 @@ async def test_errors(
 
 
 @pytest.mark.parametrize(
+    ("exc", "message"),
+    [
+        (TimeoutError(), "GET /v1/info: cannot connect (timeout)"),
+        (
+            aiohttp.ClientConnectionError("Cannot connect to host 192.168.1.1:443"),
+            "GET /v1/info: cannot connect (ClientConnectionError)",
+        ),
+    ],
+)
+async def test_cannot_connect_message(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    exc: Exception,
+    message: str,
+) -> None:
+    """Connection errors name the request and error type, never the host."""
+    aioclient_mock.get(f"{BASE}/v1/info", exc=exc)
+    with pytest.raises(UnifiCannotConnect) as err:
+        await _client(hass).async_get_application_version()
+    assert str(err.value) == message
+
+
+@pytest.mark.parametrize(
     ("kwargs", "message"),
     [
         # Standard error body of the API: code and message are passed on.
