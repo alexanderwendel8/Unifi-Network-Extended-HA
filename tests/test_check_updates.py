@@ -41,8 +41,19 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "| Home Assistant | 2026.11.2 (Home Assistant OS 18.4) |\n",
         encoding="utf-8",
     )
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "unifi-network-api.openapi.json").write_text(
+        '{"info": {"version": "10.3.58"}}', encoding="utf-8"
+    )
     monkeypatch.setattr(check_updates, "ROOT", tmp_path)
     return tmp_path
+
+
+def _mirror(repo: Path, *versions: str) -> None:
+    for version in versions:
+        path = repo / "docs" / "api" / "network" / version / "openapi.json"
+        path.parent.mkdir(parents=True)
+        path.write_text("{}", encoding="utf-8")
 
 
 class FakeSources:
@@ -145,6 +156,21 @@ def test_everything_current(repo: Path) -> None:
         "pypi:pytest-homeassistant-custom-component",
         "homeassistant:tested",
         "python:homeassistant",
+        "unifi-api:network",
+    }
+
+
+def test_unifi_api_newer_version_mirrored(repo: Path) -> None:
+    """A mirrored version newer than the one in use creates a finding."""
+    _mirror(repo, "v10.3.58")
+    results, _ = check_updates.collect(CURRENT)
+    assert "unifi-api:network" not in _findings(results)
+
+    _mirror(repo, "v10.6.109", "v11.0.97")
+    results, errors = check_updates.collect(CURRENT)
+    assert errors == []
+    assert _findings(results) == {
+        "unifi-api:network": "Aktualisierung: UniFi Network API 10.3.58 → 11.0.97"
     }
 
 
@@ -184,7 +210,7 @@ def test_home_assistant_patch_release_is_ignored(repo: Path) -> None:
 def test_failed_checks_are_reported(repo: Path) -> None:
     """Network errors become errors instead of findings."""
     results, errors = check_updates.collect(FakeSources())
-    assert results == []
+    assert [r.key for r in results] == ["unifi-api:network"]
     assert check_updates.failed_keys(errors) == {
         "action:actions/checkout",
         "action:actions/setup-python",

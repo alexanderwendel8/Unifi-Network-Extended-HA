@@ -5,6 +5,15 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Entwicklung
+
+- Neuer Workflow `api-mirror.yml`: spiegelt jeden Montag die offiziellen Spezifikationen der
+  UniFi Network API von developer.ui.com nach `docs/api/network/<Version>/openapi.json`
+  (Übersicht in `docs/api/README.md`). Vorhandene Versionen werden nie geändert oder gelöscht.
+  Logik in `.github/scripts/mirror_api.py`, mit Tests.
+- `update-check.yml` legt ein Issue an, wenn eine neuere API-Version gespiegelt ist als die,
+  gegen die entwickelt wird (`docs/unifi-network-api.openapi.json`).
+
 ### Behoben
 
 - Bei Verbindungsfehlern (Zeitüberschreitung, Verbindung abgelehnt) blieb die Meldung

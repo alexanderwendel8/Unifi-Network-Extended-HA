@@ -1,0 +1,57 @@
+name: API mirror
+
+# Mirrors the official UniFi Network API specifications from
+# https://developer.ui.com into docs/api/network/<version>/openapi.json.
+# Existing versions are never changed or deleted. Logic:
+# .github/scripts/mirror_api.py
+#
+# New files are committed directly to main (only docs/api/). The workflow
+# "Update check" runs later the same morning and opens an issue when a newer
+# version than the one the integration uses has been mirrored.
+
+on:
+  schedule:
+    # Weekly, Monday morning (UTC), before update-check.yml.
+    - cron: "11 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    name: Offizielle API-Spezifikationen spiegeln
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      # Only the standard library is used; no dependencies to install.
+      - name: Mirror specifications
+        id: mirror
+        # Commit what was mirrored even if single versions failed.
+        continue-on-error: true
+        run: python .github/scripts/mirror_api.py
+      - name: Commit new versions
+        run: |
+          git add docs/api
+          if git diff --cached --quiet; then
+            echo "Keine neuen Versionen."
+          else
+            versions=$(git diff --cached --name-only --diff-filter=A \
+              | sed -n 's#^docs/api/network/\(v[^/]*\)/openapi.json$#\1#p' \
+              | paste -sd ' ' -)
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "API-Spiegel: UniFi Network API ${versions}"
+            git push
+            echo "Neu gespiegelt: ${versions}" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Fail if mirroring had errors
+        if: steps.mirror.outcome == 'failure'
+        run: exit 1
