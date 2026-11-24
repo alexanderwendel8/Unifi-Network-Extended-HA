@@ -411,6 +411,9 @@ async def test_radio_sensors(
     assert (
         hass.states.get("sensor.access_point_5_ghz_wi_fi_standard").state == "802.11be"
     )
+    assert hass.states.get("sensor.access_point_5_ghz_tx_power_mode").state == "high"
+    # No txPowerMode (UniFi Network before 11.0): the sensor is not created.
+    assert hass.states.get("sensor.access_point_2_4_ghz_tx_power_mode") is None
     assert hass.states.get("sensor.access_point_2_4_ghz_tx_retries").state == "12.5"
     assert hass.states.get("sensor.access_point_5_ghz_tx_retries").state == "3.2"
     assert _state(hass, f"{ACCESS_POINT.id}_radio_2_4_channel") == "6"

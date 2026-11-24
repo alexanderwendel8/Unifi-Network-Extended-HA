@@ -5,6 +5,20 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Entitäten
+
+- Neuer Sensor **Sendeleistung** je Funkband eines Access Points (Diagnose): der eingestellte
+  Modus Automatisch, Niedrig, Mittel, Hoch, Benutzerdefiniert oder Deaktiviert. UniFi liefert
+  den Wert ab UniFi Network 11.0; bei älteren Versionen wird der Sensor nicht angelegt. Nach
+  einem Update von UniFi Network auf 11.0 erscheint er nach dem Neuladen der Integration.
+
+### Geändert
+
+- Entwickelt wird jetzt gegen die UniFi Network API **11.0.97** statt 10.3.58 (#39):
+  `docs/unifi-network-api.openapi.json` ist die offizielle Datei aus dem Spiegel. Es sind keine
+  Endpunkte dazugekommen oder weggefallen. Funkbänder mit 0,9 GHz und der WLAN-Standard
+  802.11ah (Wi-Fi HaLow) werden wie die anderen Bänder dargestellt.
+
 ### Entwicklung
 
 - Neuer Workflow `api-mirror.yml`: spiegelt jeden Montag die offiziellen Spezifikationen der

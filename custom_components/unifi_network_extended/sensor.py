@@ -353,7 +353,11 @@ class UnifiRadioSensorDescription(SensorEntityDescription):
     """Describes a sensor of an access point radio."""
 
     value_fn: Callable[[UnifiRadio], str | int | None]
+    # Whether the radio provides the value at all (older API versions).
+    exists_fn: Callable[[UnifiRadio], bool] = lambda radio: True
 
+
+RADIO_TX_POWER_MODES = ["auto", "low", "medium", "high", "custom", "disabled"]
 
 RADIO_SENSORS: tuple[UnifiRadioSensorDescription, ...] = (
     UnifiRadioSensorDescription(
@@ -375,6 +379,20 @@ RADIO_SENSORS: tuple[UnifiRadioSensorDescription, ...] = (
         translation_key="radio_wlan_standard",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda radio: radio.wlan_standard,
+    ),
+    UnifiRadioSensorDescription(
+        key="tx_power_mode",
+        translation_key="radio_tx_power_mode",
+        device_class=SensorDeviceClass.ENUM,
+        options=RADIO_TX_POWER_MODES,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        # txPowerMode exists since UniFi Network API 11.0.
+        exists_fn=lambda radio: radio.tx_power_mode is not None,
+        value_fn=lambda radio: (
+            _enum(radio.tx_power_mode, RADIO_TX_POWER_MODES)
+            if radio.tx_power_mode
+            else None
+        ),
     ),
 )
 
@@ -465,6 +483,7 @@ async def async_setup_entry(
         lambda device_id, band: (
             UnifiRadioSensor(details_coordinator, description, device_id, band)
             for description in RADIO_SENSORS
+            if description.exists_fn(details_coordinator.data[device_id].radios[band])
         ),
         async_add_entities,
     )
@@ -621,7 +640,7 @@ class UnifiDetailsSensor(UnifiDeviceDetailsEntity, SensorEntity):
 
 
 class UnifiRadioSensor(UnifiRadioEntity, SensorEntity):
-    """Sensor of an access point radio (channel, channel width, standard)."""
+    """Sensor of an access point radio (channel, width, standard, TX power)."""
 
     entity_description: UnifiRadioSensorDescription
 

@@ -136,7 +136,11 @@ ACCESS_POINT_DETAILS = UnifiDeviceDetails(
             frequency_ghz=2.4, wlan_standard="802.11ax", channel_width_mhz=20, channel=6
         ),
         "5": UnifiRadio(
-            frequency_ghz=5, wlan_standard="802.11be", channel_width_mhz=160, channel=36
+            frequency_ghz=5,
+            wlan_standard="802.11be",
+            channel_width_mhz=160,
+            channel=36,
+            tx_power_mode="HIGH",
         ),
     },
 )

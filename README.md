@@ -8,7 +8,7 @@ Custom Integration für Home Assistant, die eine UniFi Network Anwendung
 Benutzername und Passwort und ohne inoffizielle Endpunkte. Die verwendete
 Spezifikation liegt unter
 [`docs/unifi-network-api.openapi.json`](docs/unifi-network-api.openapi.json)
-(UniFi Network API 10.3.58).
+(UniFi Network API 11.0.97).
 
 **Was die Integration bietet:**
 - **Gateways, Switches und Access Points** als Geräte mit Status, CPU- und
@@ -35,7 +35,7 @@ Getestet an einem echten UniFi-Netz mit folgender Umgebung und folgenden Geräte
 |---|---|
 | Home Assistant | 2026.11.2 (Home Assistant OS 18.4) |
 | UniFi Network Extended | 0.2.0 |
-| UniFi Network API (Spezifikation) | 10.3.58 |
+| UniFi Network API (Spezifikation) | 11.0.97 |
 | UniFi-Network-Anwendung (Sensor *UniFi-Network-Version*) | 11.0.104 |
 
 | Gerät | Typ | Firmware |
@@ -156,6 +156,8 @@ Home Assistant automatisch einen neuen an.
 
 **Pro Funkband** (Access Points, je 2,4 / 5 / 6 GHz)
 - Kanal, Kanalbreite und WLAN-Standard (Diagnose)
+- Sendeleistung als Modus (Automatisch, Niedrig, Mittel, Hoch, Benutzerdefiniert, Deaktiviert;
+  Diagnose, ab UniFi Network 11.0)
 - TX-Wiederholungen in % (Anteil erneut gesendeter Pakete, ein Hinweis auf
   Störungen oder Überlast)
 

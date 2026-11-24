@@ -370,6 +370,14 @@ async def test_radios_in_details_and_statistics(
                         "frequencyGHz": 6,
                         "wlanStandard": "802.11be",
                         "channelWidthMHz": 320,
+                        "txPowerMode": "AUTO",
+                    },
+                    # Wi-Fi HaLow (API 11.0).
+                    {
+                        "frequencyGHz": 0.9,
+                        "wlanStandard": "802.11ah",
+                        "channelWidthMHz": 2,
+                        "txPowerMode": "CUSTOM",
                     },
                 ]
             },
@@ -389,8 +397,11 @@ async def test_radios_in_details_and_statistics(
     client = _client(hass)
 
     details = await client.async_get_device_details("s1", "ap")
-    assert set(details.radios) == {"2.4", "6"}
+    assert set(details.radios) == {"0.9", "2.4", "6"}
     assert details.radios["2.4"].channel == 6
+    assert details.radios["2.4"].tx_power_mode is None
+    assert details.radios["6"].tx_power_mode == "AUTO"
+    assert details.radios["0.9"].wlan_standard == "802.11ah"
     assert details.radios["6"].channel is None
     assert details.radios["6"].channel_width_mhz == 320
 
