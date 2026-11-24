@@ -5,6 +5,12 @@ Alle nennenswerten Änderungen an dieser Integration. Neue Einträge kommen zuer
 
 ## Unreleased
 
+### Entwicklung
+
+- Neuer Workflow `prerelease.yml`: erstellt manuell eine Vorabversion (`vX.Y.Zb1`, `b2` …) vom
+  aktuellen Stand von `main`, mit den Notizen aus „Unreleased“. So lassen sich Änderungen über
+  den Marketplace testen (Schalter „Pre-release“ beim Repository), ohne ein Release zu machen.
+
 ### Entitäten
 
 - Neuer Sensor **Sendeleistung** je Funkband eines Access Points (Diagnose): der eingestellte

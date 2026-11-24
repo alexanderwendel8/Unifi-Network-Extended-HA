@@ -322,3 +322,19 @@ mit den Notizen aus dem Changelog – entweder per Tag `vX.Y.Z` oder manuell unt
 *Actions → Release → Run workflow* (auf `main`, Eingabe z. B. `0.1.0`; der Tag wird dann gesetzt).
 Die Version muss zu `manifest.json` passen. Marketplace bzw. HACS zeigen dann die Versionsnummer
 statt des Commit-Hashs und bieten neue Releases als Update an.
+
+### Vorabversionen
+
+Der Marketplace meldet nur Releases als Update, keine einzelnen Commits auf `main`
+([Quellcode](https://github.com/home-assistant/core/blob/2026.11.2/homeassistant/components/marketplace/repositories/base.py)).
+Zum Testen vor einem Release erstellt der Workflow `prerelease.yml` eine Vorabversion vom
+aktuellen Stand von `main`: *Actions → Pre-release → Run workflow*, Eingabe ist die geplante
+nächste Version, z. B. `0.4.0`. Daraus entsteht `v0.4.0b1`, beim nächsten Lauf `v0.4.0b2` usw.,
+mit den Notizen aus „Unreleased“. Ein Pull Request ist dafür nicht nötig; `main` bleibt
+unverändert (die Version `0.4.0b1` steht nur im Commit des Tags).
+
+Der Marketplace bietet Vorabversionen nur an, wenn beim Repository der Schalter **Pre-release**
+eingeschaltet ist: *Einstellungen → Geräte & Dienste → Marketplace → UniFi Network Extended*,
+dort die standardmäßig deaktivierte Entität **Pre-release** aktivieren und einschalten
+([Doku](https://www.home-assistant.io/integrations/marketplace)). Alle anderen bekommen weiter
+nur stabile Releases.
