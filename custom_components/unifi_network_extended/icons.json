@@ -109,6 +109,9 @@
       "radio_wlan_standard": {
         "default": "mdi:wifi-cog"
       },
+      "radio_tx_power_mode": {
+        "default": "mdi:signal"
+      },
       "radio_tx_retries": {
         "default": "mdi:wifi-refresh"
       }

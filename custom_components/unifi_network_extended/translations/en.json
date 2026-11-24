@@ -204,6 +204,17 @@
       "radio_wlan_standard": {
         "name": "{band} GHz Wi-Fi standard"
       },
+      "radio_tx_power_mode": {
+        "name": "{band} GHz TX power mode",
+        "state": {
+          "auto": "Auto",
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High",
+          "custom": "Custom",
+          "disabled": "Disabled"
+        }
+      },
       "radio_tx_retries": {
         "name": "{band} GHz TX retries"
       }

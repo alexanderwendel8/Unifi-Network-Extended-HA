@@ -2,7 +2,7 @@
 
 - UniFi-Funktionen werden **ausschließlich** gegen die offizielle UniFi Network API
   entwickelt. Maßgeblich ist `docs/unifi-network-api.openapi.json`
-  (UniFi Network API, Version 10.3.58).
+  (UniFi Network API, Version 11.0.97).
 - Unter `docs/api/network/<Version>/openapi.json` liegen alle offiziellen Versionen der
   Spezifikation (automatisch gespiegelt von developer.ui.com durch `api-mirror.yml`; nicht
   von Hand bearbeiten, nichts löschen). Sie dienen zum Vergleich; maßgeblich bleibt die

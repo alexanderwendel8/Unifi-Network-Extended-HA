@@ -256,10 +256,13 @@ def radio_band(frequency_ghz: float) -> str:
 class UnifiRadio:
     """A wireless radio of an access point ("Wireless radio overview")."""
 
-    frequency_ghz: float  # 2.4, 5, 6 or 60
-    wlan_standard: str  # 802.11a/b/g/n/ac/ax/be
+    frequency_ghz: float  # 0.9, 2.4, 5, 6 or 60
+    wlan_standard: str  # 802.11a/b/g/n/ac/ax/be/ah
     channel_width_mhz: int
     channel: int | None
+    # AUTO, LOW, MEDIUM, HIGH, CUSTOM or DISABLED. Required since API 11.0;
+    # older UniFi Network versions do not send it.
+    tx_power_mode: str | None = None
 
     @classmethod
     def from_api(cls, data: Mapping[str, Any]) -> UnifiRadio:
@@ -269,6 +272,7 @@ class UnifiRadio:
             wlan_standard=_required(data, "wlanStandard", str),
             channel_width_mhz=_required(data, "channelWidthMHz", int),
             channel=_optional(data, "channel", int),
+            tx_power_mode=_optional(data, "txPowerMode", str),
         )
 
 
