@@ -277,9 +277,16 @@ dem Label `aktualisierung` an:
 - **Home Assistant:** neues Monatsrelease gegenüber der im README getesteten Version und
   eine höhere Python-Mindestversion als in der Test-Matrix
 
+- **UniFi Network API:** neuere gespiegelte Version als die, gegen die entwickelt wird
+
 Ist die Komponente wieder aktuell, schließt der Workflow das Issue selbst. Die Prüfungen stehen
 in [`.github/scripts/check_updates.py`](.github/scripts/check_updates.py); lokal zeigt
 `python .github/scripts/check_updates.py --dry-run` das Ergebnis, ohne Issues zu ändern.
+
+Der Workflow [`api-mirror.yml`](.github/workflows/api-mirror.yml) spiegelt jeden Montag die
+offiziellen Spezifikationen der UniFi Network API von <https://developer.ui.com/network> nach
+[`docs/api/`](docs/api/README.md), eine Datei je Version. Vorhandene Versionen werden nie
+geändert oder gelöscht. Neue Dateien committet der Workflow direkt auf `main`.
 
 Neue Funktionen werden ausschließlich gegen die offizielle API aus
 `docs/unifi-network-api.openapi.json` entwickelt (siehe `CLAUDE.md`).

@@ -8,6 +8,8 @@ Checked components:
 - Home Assistant: new release (year.month) compared with the version tested
   in README.md, and the Python version the latest release requires compared
   with the newest Python version in the test matrix
+- UniFi Network API: newest specification mirrored under ``docs/api/network``
+  (workflow api-mirror.yml) compared with the one the integration uses
 
 For each outdated component there is exactly one open issue with the label
 ``aktualisierung``; it is identified by a hidden marker in the body. Issues
@@ -323,7 +325,61 @@ def check_home_assistant(sources: Sources) -> Iterator[Result | CheckError]:
             yield err
 
 
-CHECKS = (check_actions, check_python_packages, check_home_assistant)
+def check_unifi_api(sources: Sources) -> Iterator[Result | CheckError]:
+    """Compare the newest mirrored UniFi Network API with the one in use.
+
+    The workflow api-mirror.yml stores the official specifications under
+    docs/api/network/<version>/; this check needs no network access.
+    """
+    key = "unifi-api:network"
+
+    def check() -> Finding | None:
+        mirrored = [
+            path.parent.name.removeprefix("v")
+            for path in (ROOT / "docs" / "api" / "network").glob("v*/openapi.json")
+        ]
+        versions = [v for v in mirrored if parse_version(v) is not None]
+        if not versions:
+            return None
+        latest = max(versions, key=lambda v: parse_version(v) or ())
+        used = json.loads(_read("docs/unifi-network-api.openapi.json"))["info"][
+            "version"
+        ]
+        if not is_newer(latest, used):
+            return None
+        return Finding(
+            key=key,
+            title=f"Aktualisierung: UniFi Network API {used} → {latest}",
+            body="\n".join(
+                [
+                    f"Die UniFi Network API ist in Version **{latest}** "
+                    f"veröffentlicht; entwickelt wird gegen **{used}** "
+                    "(`docs/unifi-network-api.openapi.json`).",
+                    "",
+                    "Gespiegelte Spezifikation: "
+                    f"`docs/api/network/v{latest}/openapi.json`",
+                    "",
+                    "Zu tun: beide Spezifikationen vergleichen (neue, geänderte und "
+                    "entfernte Endpunkte und Felder, vor allem bei den von der "
+                    "Integration genutzten Endpunkten), `docs/unifi-network-api."
+                    "openapi.json` ersetzen und die Versionsangabe in `CLAUDE.md` und "
+                    "README anpassen.",
+                ]
+            ),
+        )
+
+    try:
+        yield _run(key, check)
+    except CheckError as err:
+        yield err
+
+
+CHECKS = (
+    check_actions,
+    check_python_packages,
+    check_home_assistant,
+    check_unifi_api,
+)
 
 
 def collect(sources: Sources) -> tuple[list[Result], list[CheckError]]:

@@ -3,6 +3,10 @@
 - UniFi-Funktionen werden **ausschließlich** gegen die offizielle UniFi Network API
   entwickelt. Maßgeblich ist `docs/unifi-network-api.openapi.json`
   (UniFi Network API, Version 10.3.58).
+- Unter `docs/api/network/<Version>/openapi.json` liegen alle offiziellen Versionen der
+  Spezifikation (automatisch gespiegelt von developer.ui.com durch `api-mirror.yml`; nicht
+  von Hand bearbeiten, nichts löschen). Sie dienen zum Vergleich; maßgeblich bleibt die
+  oben genannte Datei, bis sie bewusst auf eine neuere Version umgestellt wird.
 - Keine inoffiziellen oder undokumentierten Endpunkte verwenden, zum Beispiel
   `/api/auth/login`, `/api/s/<site>/...` oder `/proxy/network/api/...`.
   Ist eine Funktion in der Spezifikation nicht vorhanden, wird sie nicht umgesetzt.
