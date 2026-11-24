@@ -14,6 +14,7 @@ from homeassistant.const import (
     CONF_VERIFY_SSL,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -181,10 +182,31 @@ async def _count_setups(
     return mock_api["devices"].await_count - before
 
 
+def _tracker_entries(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> list[er.RegistryEntry]:
+    """Return the device tracker entities of the entry."""
+    return [
+        entry
+        for entry in er.async_entries_for_config_entry(
+            er.async_get(hass), config_entry.entry_id
+        )
+        if entry.domain == "device_tracker"
+    ]
+
+
+# Home Assistant 2026.11 logs this when a flow reloads an entry that also has an
+# update listener (``async_update_reload_and_abort``).
+UPDATE_LISTENER_WARNING = "has an update listener"
+
+
 async def test_reconfigure_reloads_once(
-    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Reconfigure reloads the entry once, not again via the update listener."""
+    """Reconfigure reloads the entry exactly once."""
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
     before = mock_api["devices"].await_count
@@ -204,12 +226,16 @@ async def test_reconfigure_reloads_once(
     assert await _count_setups(hass, mock_api, before) == 1
     assert config_entry.state is ConfigEntryState.LOADED
     assert config_entry.data[CONF_HOST] == "192.168.1.2"
+    assert UPDATE_LISTENER_WARNING not in caplog.text
 
 
 async def test_reauth_reloads_once(
-    hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    mock_api: dict[str, AsyncMock],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A new API key reloads the entry once, not again via the update listener."""
+    """A new API key reloads the entry exactly once."""
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
     before = mock_api["devices"].await_count
@@ -221,13 +247,15 @@ async def test_reauth_reloads_once(
     assert result["reason"] == "reauth_successful"
 
     assert await _count_setups(hass, mock_api, before) == 1
+    assert config_entry.state is ConfigEntryState.LOADED
     assert config_entry.data[CONF_API_KEY] == "new-key"
+    assert UPDATE_LISTENER_WARNING not in caplog.text
 
 
 async def test_options_change_reloads_once(
     hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
 ) -> None:
-    """Changed options reload the entry (once); unchanged options do not."""
+    """Changed options reload the entry once and apply at once; unchanged do not."""
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done(wait_background_tasks=True)
     before = mock_api["devices"].await_count
@@ -235,14 +263,17 @@ async def test_options_change_reloads_once(
     options = {
         CONF_SCAN_INTERVAL: 60,
         CONF_STATISTICS_INTERVAL: 120,
-        CONF_TRACK_CLIENTS: True,
+        CONF_TRACK_CLIENTS: False,
     }
+    assert _tracker_entries(hass, config_entry)
     result = await hass.config_entries.options.async_init(config_entry.entry_id)
     await hass.config_entries.options.async_configure(result["flow_id"], options)
     assert await _count_setups(hass, mock_api, before) == 1
+    assert config_entry.state is ConfigEntryState.LOADED
     assert config_entry.runtime_data.site_coordinator.update_interval == timedelta(
         seconds=60
     )
+    assert not _tracker_entries(hass, config_entry)
 
     # Saving the same options again does not reload.
     before = mock_api["devices"].await_count

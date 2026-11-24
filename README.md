@@ -65,7 +65,7 @@ Weitere Rückmeldungen zu Geräten gern als
 
 ## Installation
 
-**Voraussetzung:** Home Assistant **2025.3.0** oder neuer (wie in
+**Voraussetzung:** Home Assistant **2025.8.0** oder neuer (wie in
 [`hacs.json`](hacs.json) angegeben). Die automatischen Tests laufen gegen diese
 Mindestversion, gegen 2026.2 (letzte Version für Python 3.13) und gegen die
 aktuelle Version.

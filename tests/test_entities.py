@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import (
+    CONF_SCAN_INTERVAL,
     STATE_HOME,
     STATE_NOT_HOME,
     STATE_OFF,
@@ -25,6 +26,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClien
 
 from custom_components.unifi_network_extended.api import UnifiCannotConnect
 from custom_components.unifi_network_extended.const import (
+    CONF_STATISTICS_INTERVAL,
     CONF_TRACK_CLIENTS,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_STATISTICS_INTERVAL,
@@ -257,12 +259,18 @@ async def test_trackers_restored_after_reload(
 async def test_disable_client_tracking_removes_trackers(
     hass: HomeAssistant, config_entry: MockConfigEntry, mock_api: dict[str, AsyncMock]
 ) -> None:
-    """Switching tracking off removes existing trackers."""
+    """Switching tracking off in the options removes trackers right away."""
     await _setup(hass, config_entry)
-    hass.config_entries.async_update_entry(
-        config_entry, options={CONF_TRACK_CLIENTS: False}
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
+            CONF_STATISTICS_INTERVAL: DEFAULT_STATISTICS_INTERVAL,
+            CONF_TRACK_CLIENTS: False,
+        },
     )
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
     entries = er.async_entries_for_config_entry(
         er.async_get(hass), config_entry.entry_id
